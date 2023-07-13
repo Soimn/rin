@@ -129,13 +129,16 @@ typedef R_u64 R_umm;
 #define R_OFFSETOF(T, E) ((R_umm)(&((T*)0)->E))
 #define R_ALIGNOF(T) R_OFFSETOF(struct { char c; T t; }, t)
 
-#define R_STATIC_ARRAY_SIZE(A) ((sizeof(A) / sizeof(0[A]))
+#define R_STATIC_ARRAY_SIZE(A) (sizeof(A) / sizeof(0[A]))
 
 #define R_IS_POW2(N) ((N) != 0 && ((N) & ((N) - 1)) == 0)
 
 #define R_KB(N) ((N)*1024ULL)
 #define R_MB(N) ((N)*1024ULL*1024ULL)
 #define R_GB(N) ((N)*1024ULL*1024ULL*1024ULL)
+
+#define R_MIN(A, B) ((A) < (B) ? (A) : (B))
+#define R_MAX(A, B) ((A) > (B) ? (A) : (B))
 
 #include <stdarg.h>
 #define R_Arg_List va_list
@@ -231,6 +234,9 @@ R_MemZero(void* ptr, R_umm size)
   for (R_umm i = 0; i < size; ++i) ((R_u8*)ptr)[i] = 0;
 }
 
+#define R_ZeroStruct(ptr) R_Zero((ptr), sizeof(0[ptr]))
+#define R_ZeroArray(ptr, count) R_Zero((ptr), sizeof(0[ptr])*(count))
+
 void
 R_MemSet(void* ptr, R_umm size, R_u8 val)
 {
@@ -246,9 +252,6 @@ R_MemCmp(void* p0, void* p1, R_umm size)
 
   return result;
 }
-
-#define R_ZeroStruct(ptr) R_Zero((ptr), sizeof(0[ptr]))
-#define R_ZeroArray(ptr, count) R_Zero((ptr), sizeof(0[ptr])*(count))
 
 typedef struct R_Arena
 {
@@ -503,6 +506,54 @@ R_String_FindLastChar(R_String string, R_u8 c)
   }
 
   return index;
+}
+
+R_String
+R_String_FirstN(R_String string, R_umm n_chars)
+{
+  return (R_String){
+    .data = string.data,
+    .size = R_MIN(string.size, n_chars),
+  };
+}
+
+R_String
+R_String_ChopN(R_String string, R_umm n_chars)
+{
+  return (R_String){
+    .data = string.data,
+    .size = R_MAX(string.size, n_chars) - n_chars,
+  };
+}
+
+R_String
+R_String_LastN(R_String string, R_umm n_chars)
+{
+  R_umm new_n_chars = R_MIN(string.size, n_chars);
+
+  return (R_String){
+    .data = string.data + (string.size - new_n_chars),
+    .size = new_n_chars,
+  };
+}
+
+R_String
+R_String_EatN(R_String string, R_umm n_chars)
+{
+  return (R_String){
+    .data = string.data + n_chars,
+    .size = R_MAX(string.size, n_chars) - n_chars,
+  };
+}
+
+// NOTE: negative past_end indices are mapped to string.size + past_end + 1
+R_String
+R_String_Slice(R_String string, R_umm start, R_smm past_end)
+{
+  R_umm chop_amount = string.size - R_MIN(string.size, past_end);
+  if (past_end < 0) chop_amount = (R_umm)(-past_end - 1);
+
+  return R_String_ChopN(R_String_EatN(string, start), chop_amount);
 }
 
 R_smm // NOTE: -1: no, or erroneous, match, x: length of matched string
