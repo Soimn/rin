@@ -546,16 +546,6 @@ R_String_EatN(R_String string, R_umm n_chars)
   };
 }
 
-// NOTE: negative past_end indices are mapped to string.size + past_end + 1
-R_String
-R_String_Slice(R_String string, R_umm start, R_smm past_end)
-{
-  R_umm chop_amount = string.size - R_MIN(string.size, past_end);
-  if (past_end < 0) chop_amount = (R_umm)(-past_end - 1);
-
-  return R_String_ChopN(R_String_EatN(string, start), chop_amount);
-}
-
 R_smm // NOTE: -1: no, or erroneous, match, x: length of matched string
 R_String_PatternMatch(R_String string, const char* format, ...) // NOTE: Var arg is a list of pointers to locations receiving the parsed input, format is limited to %%, %c, %x[size], %u[size] and %i[size] for now
 {
@@ -698,7 +688,7 @@ R_String_PatternMatch(R_String string, const char* format, ...) // NOTE: Var arg
           R_int ivalue = (sign == 1 ? (R_int)value : -(R_int)value);
           switch (bit_width)
           {
-            case 8:  *R_VA_ARG(arg_list, R_s8*)  = (R_s8)ivalue; break;
+            case 8:  *R_VA_ARG(arg_list, R_s8*)  = (R_s8)ivalue;  break;
             case 16: *R_VA_ARG(arg_list, R_s16*) = (R_s16)ivalue; break;
             case 32: *R_VA_ARG(arg_list, R_s32*) = (R_s32)ivalue; break;
             case 64: *R_VA_ARG(arg_list, R_s64*) = (R_s64)ivalue; break;
@@ -708,7 +698,7 @@ R_String_PatternMatch(R_String string, const char* format, ...) // NOTE: Var arg
         {
           switch (bit_width)
           {
-            case 8:  *R_VA_ARG(arg_list, R_u8*)  = (R_u8)value; break;
+            case 8:  *R_VA_ARG(arg_list, R_u8*)  = (R_u8)value;  break;
             case 16: *R_VA_ARG(arg_list, R_u16*) = (R_u16)value; break;
             case 32: *R_VA_ARG(arg_list, R_u32*) = (R_u32)value; break;
             case 64: *R_VA_ARG(arg_list, R_u64*) = (R_u64)value; break;
@@ -722,6 +712,275 @@ R_String_PatternMatch(R_String string, const char* format, ...) // NOTE: Var arg
   R_VA_END(arg_list);
 
   return matched_chars;
+}
+
+/// ------------------------------------------------------
+///                      Math
+/// ------------------------------------------------------
+
+typedef union R_F32_Bits
+{
+  R_f32 f;
+  R_u32 bits;
+} R_F32_Bits;
+
+typedef union R_F64_Bits
+{
+  R_f64 f;
+  R_u64 bits;
+} R_F64_Bits;
+
+#define R_SQUARED(X) ((X)*(X))
+#define R_CUBED(X) ((X)*(X)*(X))
+
+// TODO: Test
+inline R_f32
+R_Abs(R_f32 n)
+{
+#if 0
+  return (n < 0 ? -n : n);
+#else
+  return (R_F32_Bits){ .bits = (R_F32_Bits){ .f = n }.bits & 0x7FFFFFFF }.f;
+#endif
+}
+
+inline R_f32
+R_LogFloor(R_f32 n)
+{
+  R_u32 biased_exponent = ((R_F32_Bits){ .f = n }.bits >> 23) & 0x7FFFFF;
+  return (biased_exponent == 0 ? -126 : (R_f32)biased_exponent);
+}
+
+inline R_f32
+R_Sqrt(R_f32 n)
+{
+  R_NOT_IMPLEMENTED;
+}
+
+inline R_f32
+R_RSqrt(R_f32 n)
+{
+  R_NOT_IMPLEMENTED;
+}
+
+inline R_f32
+R_Sin(R_f32 n)
+{
+  R_NOT_IMPLEMENTED;
+}
+
+inline R_f32
+R_Cos(R_f32 n)
+{
+  R_NOT_IMPLEMENTED;
+}
+
+// TODO: SinCos?
+
+inline R_f32
+R_Tan(R_f32 n)
+{
+  R_NOT_IMPLEMENTED;
+}
+
+inline R_f32
+R_Tan2(R_f32 n)
+{
+  R_NOT_IMPLEMENTED;
+}
+
+typedef union R_V2
+{
+  struct { R_f32 x, y; };
+  R_f32 e[2];
+} R_V2;
+
+#define R_V2(X, Y) (R_V2){ .x = (X), .y = (Y) }
+
+inline R_V2
+R_V2_Add(R_V2 a, R_V2 b)
+{
+  return R_V2(a.x + b.x, a.y + b.y);
+}
+
+inline R_V2
+R_V2_Sub(R_V2 a, R_V2 b)
+{
+  return R_V2(a.x - b.x, a.y - b.y);
+}
+
+inline R_V2
+R_V2_Scale(R_V2 v, R_f32 n)
+{
+  return R_V2(v.x*n, v.y*n);
+}
+
+inline R_V2
+R_V2_Hadamard(R_V2 a, R_V2 b)
+{
+  return R_V2(a.x*b.x, a.y*b.y);
+}
+
+inline R_f32
+R_V2_Inner(R_V2 a, R_V2 b)
+{
+  return a.x*b.x + a.y*b.y;
+}
+
+inline R_f32
+R_V2_LengthSq(R_V2 v)
+{
+  return R_SQUARED(v.x) + R_SQUARED(v.y);
+}
+
+inline R_f32
+R_V2_Length(R_V2 v)
+{
+  return R_RSqrt(R_V2_LengthSq(v));
+}
+
+inline R_V2
+R_V2_Normalize(R_V2 v)
+{
+  return R_V2_Scale(v, R_V2_Length(v));
+}
+
+typedef union R_V3
+{
+  struct { R_f32 x, y, z; };
+  struct { R_V2 xy; R_f32 _0; };
+  struct { R_f32 _1; R_V2 yz; };
+  struct { R_f32 r, g, b; };
+  struct { R_V2 rg; R_f32 _2; };
+  struct { R_f32 _3; R_V2 gb; };
+  R_f32 e[3];
+} R_V3;
+
+#define R_V3(X, Y, Z) (R_V3){ .x = (X), .y = (Y), .z = (Z) }
+
+inline R_V3
+R_V3_Add(R_V3 a, R_V3 b)
+{
+  return R_V3(a.x + b.x, a.y + b.y, a.z + b.z);
+}
+
+inline R_V3
+R_V3_Sub(R_V3 a, R_V3 b)
+{
+  return R_V3(a.x - b.x, a.y - b.y, a.z - b.z);
+}
+
+inline R_V3
+R_V3_Scale(R_V3 v, R_f32 n)
+{
+  return R_V3(v.x*n, v.y*n, v.z*n);
+}
+
+inline R_V3
+R_V3_Hadamard(R_V3 a, R_V3 b)
+{
+  return R_V3(a.x*b.x, a.y*b.y, a.z*b.z);
+}
+
+inline R_f32
+R_V3_Inner(R_V3 a, R_V3 b)
+{
+  return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+inline R_V3
+R_V3_Cross(R_V3 a, R_V3 b)
+{
+  return R_V3(a.y*b.z - a.z*b.y, a.x*b.z - a.z*b.x, a.x*b.y - a.y*b.x);
+}
+
+inline R_f32
+R_V3_LengthSq(R_V3 v)
+{
+  return R_SQUARED(v.x) + R_SQUARED(v.y) + R_SQUARED(v.z);
+}
+
+inline R_f32
+R_V3_Length(R_V3 v)
+{
+  return R_RSqrt(R_V3_LengthSq(v));
+}
+
+inline R_f32
+R_V3_TripleProduct(R_V3 a, R_V3 b, R_V3 c)
+{
+  return R_V3_Inner(a, R_V3_Cross(b, c));
+}
+
+inline R_V3
+R_V3_Normalize(R_V3 v)
+{
+  return R_V3_Scale(v, R_V3_Length(v));
+}
+
+typedef union R_V4
+{
+  struct { R_f32 x, y, z, w; };
+  struct { R_V3 xyz; R_f32 _0; };
+  struct { R_f32 _1; R_V3 yzw; };
+  struct { R_V2 xy; R_V2 zw; };
+  struct { R_f32 _2; R_V2 yz; R_f32 _3; };
+  struct { R_f32 r, g, b, a; };
+  struct { R_V3 rgb; R_f32 _4; };
+  struct { R_f32 _5; R_V3 gba; };
+  struct { R_V2 rg; R_V2 ba; };
+  struct { R_f32 _6; R_V2 gb; R_f32 _7; };
+  R_f32 e[4];
+} R_V4;
+
+#define R_V4(X, Y, Z, W) (R_V4){ .x = (X), .y = (Y), .z = (Z), .w = (W) }
+
+inline R_V4
+R_V4_Add(R_V4 a, R_V4 b)
+{
+  return R_V4(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w);
+}
+
+inline R_V4
+R_V4_Sub(R_V4 a, R_V4 b)
+{
+  return R_V4(a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w);
+}
+
+inline R_V4
+R_V4_Scale(R_V4 v, R_f32 n)
+{
+  return R_V4(v.x*n, v.y*n, v.z*n, v.w*n);
+}
+
+inline R_V4
+R_V4_Hadamard(R_V4 a, R_V4 b)
+{
+  return R_V4(a.x*b.x, a.y*b.y, a.z*b.z, a.w*b.w);
+}
+
+inline R_f32
+R_V4_Inner(R_V4 a, R_V4 b)
+{
+  return a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w;
+}
+
+inline R_f32
+R_V4_LengthSq(R_V4 v)
+{
+  return R_SQUARED(v.x) + R_SQUARED(v.y) + R_SQUARED(v.z) + R_SQUARED(v.w);
+}
+
+inline R_f32
+R_V4_Length(R_V4 v)
+{
+  return R_RSqrt(R_V4_LengthSq(v));
+}
+
+inline R_V4
+R_V4_Normalize(R_V4 v)
+{
+  return R_V4_Scale(v, R_V4_Length(v));
 }
 
 #endif
