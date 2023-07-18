@@ -92,6 +92,11 @@ typedef double R_f64;
 #  error NOT IMPLEMENTED
 #endif
 
+#define R_U8_MAX  ((R_u8)0xFF)
+#define R_U16_MAX ((R_u16)0xFFFF)
+#define R_U32_MAX ((R_u32)0xFFFFFFFFUL)
+#define R_U64_MAX ((R_u64)0xFFFFFFFFFFFFFFFFULL)
+
 typedef R_u8 R_bool;
 #define R_true 1
 #define R_false 0
@@ -139,12 +144,24 @@ typedef R_u64 R_umm;
 
 #define R_MIN(A, B) ((A) < (B) ? (A) : (B))
 #define R_MAX(A, B) ((A) > (B) ? (A) : (B))
+#define R_ABS(N) ((N) < 0 ? -(N) : (N))
 
 #include <stdarg.h>
 #define R_Arg_List va_list
 #define R_VA_START(ARG_LIST, BEFORE_FIRST_ARG) va_start(ARG_LIST, BEFORE_FIRST_ARG)
 #define R_VA_ARG(ARG_LIST, ARG_TYPE) va_arg(ARG_LIST, ARG_TYPE)
 #define R_VA_END(ARG_LIST) va_end(ARG_LIST)
+
+/// ------------------------------------------------------
+///                     Bit Hacking
+/// ------------------------------------------------------
+
+#if R_COMPILER_MSVC
+#  define R_RotL32(N, I) _rotl((N), (I))
+#  define R_RotL64(N, I) _rotl64((N), (I))
+#else
+#  error NOT IMPLEMENTED
+#endif
 
 /// ------------------------------------------------------
 ///                        OS
@@ -356,7 +373,7 @@ R_Arena_Watermark(R_Arena* arena)
 }
 
 /// ------------------------------------------------------
-///                      Stings
+///                      Strings
 /// ------------------------------------------------------
 
 R_bool
@@ -547,7 +564,7 @@ R_String_EatN(R_String string, R_umm n_chars)
 }
 
 R_smm // NOTE: -1: no, or erroneous, match, x: length of matched string
-R_String_PatternMatch(R_String string, const char* format, ...) // NOTE: Var arg is a list of pointers to locations receiving the parsed input, format is limited to %%, %c, %x[size], %u[size] and %i[size] for now
+R_String_PatternMatch(R_String string, const char* format, ...) // NOTE: Var arg is a list of pointers to locations receiving the parsed input, format is limited to %%, %c, %x[size], %u[size] and %s[size] for now
 {
   R_Arg_List arg_list;
   R_VA_START(arg_list, format);
@@ -591,9 +608,9 @@ R_String_PatternMatch(R_String string, const char* format, ...) // NOTE: Var arg
           break;
         }
       }
-      else if (*scan == 'x' || *scan == 'u' || *scan == 'i')
+      else if (*scan == 'x' || *scan == 'u' || *scan == 's')
       {
-        R_bool is_signed = (*scan == 'd');
+        R_bool is_signed = (*scan == 's');
         R_bool is_hex    = (*scan == 'x');
         R_uint bit_width;
 
@@ -845,6 +862,56 @@ R_V2_Normalize(R_V2 v)
   return R_V2_Scale(v, R_V2_Length(v));
 }
 
+typedef union R_V2S
+{
+  struct { R_s32 x, y; };
+  R_s32 e[2];
+} R_V2S;
+
+#define R_V2S(X, Y) (R_V2S){ .x = (X), .y = (Y) }
+
+inline R_V2S
+R_V2S_Add(R_V2S a, R_V2S b)
+{
+  return R_V2S(a.x + b.x, a.y + b.y);
+}
+
+inline R_V2S
+R_V2S_Sub(R_V2S a, R_V2S b)
+{
+  return R_V2S(a.x - b.x, a.y - b.y);
+}
+
+inline R_V2S
+R_V2S_Scale(R_V2S v, R_s32 n)
+{
+  return R_V2S(v.x*n, v.y*n);
+}
+
+inline R_V2S
+R_V2S_Hadamard(R_V2S a, R_V2S b)
+{
+  return R_V2S(a.x*b.x, a.y*b.y);
+}
+
+inline R_s32
+R_V2S_Inner(R_V2S a, R_V2S b)
+{
+  return a.x*b.x + a.y*b.y;
+}
+
+inline R_u64
+R_V2S_PackToU64(R_V2S v)
+{
+  return ((R_u64)v.x << 32) | (R_u64)v.y;
+}
+
+inline R_V2S
+R_V2S_UnpackFromU64(R_u64 n)
+{
+  return R_V2S((R_s32)(n >> 32), (R_s32)(n & R_U32_MAX));
+}
+
 typedef union R_V3
 {
   struct { R_f32 x, y, z; };
@@ -982,5 +1049,149 @@ R_V4_Normalize(R_V4 v)
 {
   return R_V4_Scale(v, R_V4_Length(v));
 }
+
+/// ------------------------------------------------------
+///                     Hash Functions
+/// ------------------------------------------------------
+
+// NOTE: The following function (R_MurmurHash3_x64_128) is a copy of MurmurHash3
+//       with slight modifications (mostly renaming types and inlining utility functions).
+//       The license notice for MurmurHash3 is included below
+//-----------------------------------------------------------------------------
+// MurmurHash3 was written by Austin Appleby, and is placed in the public
+// domain. The author hereby disclaims copyright to this source code.
+
+void
+R_MurmurHash3_x64_128(R_String key, R_u32 seed, R_u64 out[2])
+{
+  R_u8* data = key.data;
+  R_int nblocks = key.size / 16;
+
+  R_u64 h1 = seed;
+  R_u64 h2 = seed;
+
+  R_u64 c1 = 0x87C37B91114253D5ULL;
+  R_u64 c2 = 0x4CF5AD432745937FULL;
+
+  //----------
+  // body
+
+  R_u64* blocks = (R_u64*)data;
+
+  for(R_uint i = 0; i < nblocks; ++i)
+  {
+    R_u64 k1 = blocks[i*2+0];
+    R_u64 k2 = blocks[i*2+1];
+
+    k1 *= c1; k1 = R_RotL64(k1,31); k1 *= c2; h1 ^= k1;
+
+    h1 = R_RotL64(h1,27); h1 += h2; h1 = h1*5+0x52DCE729;
+
+    k2 *= c2; k2  = R_RotL64(k2,33); k2 *= c1; h2 ^= k2;
+
+    h2 = R_RotL64(h2,31); h2 += h1; h2 = h2*5+0x38495AB5;
+  }
+
+  //----------
+  // tail
+
+  R_u8* tail = (R_u8*)(data + nblocks*16);
+
+  R_u64 k1 = 0;
+  R_u64 k2 = 0;
+
+  switch(key.size & 15)
+  {
+  case 15: k2 ^= ((R_u64)tail[14]) << 48;
+  case 14: k2 ^= ((R_u64)tail[13]) << 40;
+  case 13: k2 ^= ((R_u64)tail[12]) << 32;
+  case 12: k2 ^= ((R_u64)tail[11]) << 24;
+  case 11: k2 ^= ((R_u64)tail[10]) << 16;
+  case 10: k2 ^= ((R_u64)tail[ 9]) << 8;
+  case  9: k2 ^= ((R_u64)tail[ 8]) << 0;
+           k2 *= c2; k2  = R_RotL64(k2,33); k2 *= c1; h2 ^= k2;
+
+  case  8: k1 ^= ((R_u64)tail[ 7]) << 56;
+  case  7: k1 ^= ((R_u64)tail[ 6]) << 48;
+  case  6: k1 ^= ((R_u64)tail[ 5]) << 40;
+  case  5: k1 ^= ((R_u64)tail[ 4]) << 32;
+  case  4: k1 ^= ((R_u64)tail[ 3]) << 24;
+  case  3: k1 ^= ((R_u64)tail[ 2]) << 16;
+  case  2: k1 ^= ((R_u64)tail[ 1]) << 8;
+  case  1: k1 ^= ((R_u64)tail[ 0]) << 0;
+           k1 *= c1; k1  = R_RotL64(k1,31); k1 *= c2; h1 ^= k1;
+  };
+
+  //----------
+  // finalization
+
+  h1 ^= key.size; h2 ^= key.size;
+
+  h1 += h2;
+  h2 += h1;
+
+
+  h1 ^= h1 >> 33;
+  h1 *= 0xFF51AFD7ED558CCDULL;
+  h1 ^= h1 >> 33;
+  h1 *= 0xC4CEB9FE1A85EC53ULL;
+  h1 ^= h1 >> 33;
+
+  h2 ^= h2 >> 33;
+  h2 *= 0xFF51AFD7ED558CCDULL;
+  h2 ^= h2 >> 33;
+  h2 *= 0xC4CEB9FE1A85EC53ULL;
+  h2 ^= h2 >> 33;
+
+  h1 += h2;
+  h2 += h1;
+
+  out[0] = h1;
+  out[1] = h2;
+}
+
+#if 0
+/// ------------------------------------------------------
+///                     Hash Table
+/// ------------------------------------------------------
+
+typedef struct R_Hash_Table_U64_U64__Slot
+{
+  R_u64 hash;
+  R_u64 value;
+} R_Hash_Table_U64_U64__Slot;
+
+typedef struct R_Hash_Table_U64_U64
+{
+  R_Virtual_Array* keys;
+  R_Virtual_Array* slots;
+} R_Hash_Table_U64_U64;
+
+R_Hash_Table_U64_U64
+R_HashTableU64U64_Create(R_uint init_size)
+{
+}
+
+void
+R_HashTableU64U64_Destroy(R_HashTableU64U64* table)
+{
+}
+
+R_u64
+R_HashTableU64U64_Get(R_HashTableU64U64* table, R_u64 key)
+{
+}
+
+void
+R_HashTableU64U64_Put(R_HashTableU64U64* table, R_u64 key, R_u64 value)
+{
+}
+
+R_uint
+R_HashTableU64U64_KeyCount(R_Hash_Table_U64_U64* table)
+{
+  return R_VArray_Size(table->keys);
+}
+#endif
 
 #endif
