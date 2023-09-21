@@ -4,6 +4,9 @@ setlocal
 
 cd %~dp0
 
+if not exist build mkdir build
+cd build
+
 if "%Platform%" neq "x64" (
 	echo ERROR: Platform is not "x64" - please run this from the MSVC x64 native tools command prompt.
 	goto end
@@ -17,14 +20,12 @@ set "link_options=%common_link_options% libucrtd.lib libvcruntimed.lib"
 
 if "%1" neq "" goto invalid_arguments
 
-cl %compile_options% rin_test.c /link %link_options% /pdb:rin_test.pdb /out:rin_test.exe
-
-rin_test.exe
+cl %compile_options% ..\src\main.c /link %link_options% /pdb:main.pdb /out:main.exe
 
 goto end
 
 :invalid_arguments
-echo Invalid arguments^. Usage: run_tests
+echo Invalid arguments^. Usage: build
 goto end
 
 :end
