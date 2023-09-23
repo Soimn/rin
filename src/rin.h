@@ -172,6 +172,10 @@ typedef union F64_Bits
 	u64 bits;
 } F64_Bits;
 
+#define ABS(N) ((N) < 0 ? -(N) : (N))
+#define MIN(A, B) ((A) < (B) ? (A) : (B))
+#define MAX(A, B) ((A) < (B) ? (B) : (A))
+
 typedef union V2
 {
 	struct { f32 x, y; };
@@ -220,24 +224,57 @@ typedef struct V4S
 	s32 e[4];
 } V4S;
 
+typedef struct Rect
+{
+	V2 min;
+	V2 max;
+} Rect;
+
+typedef struct Cuboid
+{
+	V3 min;
+	V3 max;
+} Cuboid;
+
+typedef struct Hypercuboid
+{
+	V4 min;
+	V4 max;
+} Hypercuboid;
+
+typedef struct RectS
+{
+	V2S min;
+	V2S max;
+} RectS;
+
+typedef struct CuboidS
+{
+	V3S min;
+	V3S max;
+} CuboidS;
+
+typedef struct HypercuboidS
+{
+	V4S min;
+	V4S max;
+} HypercuboidS;
+
 typedef union M2
 {
-	struct { V2 i, j; };
-	V2 col[2];
+	V2 row[2];
 	f32 e[4];
 } M2;
 
 typedef union M3
 {
-	struct { V3 i, j, k; };
-	V3 col[3];
+	V3 row[3];
 	f32 e[9];
 } M3;
 
 typedef union M4
 {
-	struct { V4 i, j, k, l; };
-	V4 col[4];
+	V4 row[4];
 	f32 e[16];
 } M4;
 
@@ -248,9 +285,16 @@ typedef union M4
 #define V3S(X, Y, Z)    (V3S){ .x = (X), .y = (Y), .z = (Z) }
 #define V4S(X, Y, Z, W) (V4S){ .x = (X), .y = (Y), .z = (Z), .w = (W) }
 
-#define M2(I, J)        (M2){ .i = (I), .j = (J) }
-#define M3(I, J, K)     (M3){ .i = (I), .j = (J), .k = (K) }
-#define M4(I, J, K, L)  (M4){ .i = (I), .j = (J), .k = (K), .l = (L) }
+#define Rect(MINV, MAXV)         (Rect)     { .min = (MINV), .max = (MAXV) }
+#define Cuboid(MINV, MAXV)       (Cuboid){ .min = (MINV), .max = (MAXV) }
+#define Hypercuboid(MINV, MAXV)  (Hypercuboid){ .min = (MINV), .max = (MAXV) }
+#define RectS(MINV, MAXV)        (RectS)     { .min = (MINV), .max = (MAXV) }
+#define CuboidS(MINV, MAXV)      (CuboidS){ .min = (MINV), .max = (MAXV) }
+#define HypercuboidS(MINV, MAXV) (HypercuboidS){ .min = (MINV), .max = (MAXV) }
+
+#define M2(R0, R1)         (M2){ .row = { [0] = (R0), [1] = (R1) } }
+#define M3(R0, R1, R2)     (M3){ .row = { [0] = (R0), [1] = (R1), [2] = (R2) } }
+#define M4(R0, R1, R2, R3) (M4){ .row = { [0] = (R0), [1] = (R1), [2] = (R2), [3] = (R3) } }
 
 V2  V2_Set1     (f32 n)          { return V2(n, n);                                                                           }
 V3  V3_Set1     (f32 n)          { return V3(n, n, n);                                                                        }
@@ -302,193 +346,318 @@ V3S V3S_Cross   (V3S v0, V3S v1) { return V3S(v0.y*v1.z - v0.z*v1.y, v0.z*v1.x -
 M2  V2_Outer    (V2 v0, V2 v1)   { return M2(V2_Scale(v1, v0.x), V2_Scale(v1, v0.y));                                         }
 M3  V3_Outer    (V3 v0, V3 v1)   { return M3(V3_Scale(v1, v0.x), V3_Scale(v1, v0.y), V3_Scale(v1, v0.z));                     }
 M4  V4_Outer    (V4 v0, V4 v1)   { return M4(V4_Scale(v1, v0.x), V4_Scale(v1, v0.y), V4_Scale(v1, v0.z), V4_Scale(v1, v0.w)); }
+V2  V2_Abs      (V2 v)           { return V2(ABS(v.x), ABS(v.y));                                                             }
+V3  V3_Abs      (V3 v)           { return V3(ABS(v.x), ABS(v.y), ABS(v.z));                                                   }
+V4  V4_Abs      (V4 v)           { return V4(ABS(v.x), ABS(v.y), ABS(v.z), ABS(v.w));                                         }
+V2  V2_Min      (V2 v0, V2 v1)   { return V2(MIN(v0.x, v1.x), MIN(v0.y, v1.y));                                               }
+V3  V3_Min      (V3 v0, V3 v1)   { return V3(MIN(v0.x, v1.x), MIN(v0.y, v1.y), MIN(v0.z, v1.z));                              }
+V4  V4_Min      (V4 v0, V4 v1)   { return V4(MIN(v0.x, v1.x), MIN(v0.y, v1.y), MIN(v0.z, v1.z), MIN(v0.w, v1.w));             }
+V2S V2S_Min     (V2S v0, V2S v1) { return V2S(MIN(v0.x, v1.x), MIN(v0.y, v1.y));                                              }
+V3S V3S_Min     (V3S v0, V3S v1) { return V3S(MIN(v0.x, v1.x), MIN(v0.y, v1.y), MIN(v0.z, v1.z));                             }
+V4S V4S_Min     (V4S v0, V4S v1) { return V4S(MIN(v0.x, v1.x), MIN(v0.y, v1.y), MIN(v0.z, v1.z), MIN(v0.w, v1.w));            }
+V2  V2_Max      (V2 v0, V2 v1)   { return V2(MAX(v0.x, v1.x), MAX(v0.y, v1.y));                                               }
+V3  V3_Max      (V3 v0, V3 v1)   { return V3(MAX(v0.x, v1.x), MAX(v0.y, v1.y), MAX(v0.z, v1.z));                              }
+V4  V4_Max      (V4 v0, V4 v1)   { return V4(MAX(v0.x, v1.x), MAX(v0.y, v1.y), MAX(v0.z, v1.z), MAX(v0.w, v1.w));             }
+V2S V2S_Max     (V2S v0, V2S v1) { return V2S(MAX(v0.x, v1.x), MAX(v0.y, v1.y));                                              }
+V3S V3S_Max     (V3S v0, V3S v1) { return V3S(MAX(v0.x, v1.x), MAX(v0.y, v1.y), MAX(v0.z, v1.z));                             }
+V4S V4S_Max     (V4S v0, V4S v1) { return V4S(MAX(v0.x, v1.x), MAX(v0.y, v1.y), MAX(v0.z, v1.z), MAX(v0.w, v1.w));            }
 
-#define M2_Row(M, N) V2((M).i.e[N], (M).j.e[N])
-#define M3_Row(M, N) V3((M).i.e[N], (M).j.e[N], (M).k.e[N])
-#define M4_Row(M, N) V4((M).i.e[N], (M).j.e[N], (M).k.e[N], (M).l.e[N])
+Rect
+Rect_FromCenterDim(V2 center, V2 dim)
+{
+	V2 hdim = V2_Scale(dim, 0.5f);
+	return Rect(V2_Sub(center, hdim), V2_Add(center, hdim));
+}
+
+Cuboid
+Cuboid_FromCenterDim(V3 center, V3 dim)
+{
+	V3 hdim = V3_Scale(dim, 0.5f);
+	return Cuboid(V3_Sub(center, hdim), V3_Add(center, hdim));
+}
+
+Hypercuboid
+Hypercuboid_FromCenterDim(V4 center, V4 dim)
+{
+	V4 hdim = V4_Scale(dim, 0.5f);
+	return Hypercuboid(V4_Sub(center, hdim), V4_Add(center, hdim));
+}
+
+RectS
+RectS_FromCenterDim(V2S center, V2S dim)
+{
+	V2S hdim = V2S_InvScale(dim, 2);
+	return RectS(V2S_Sub(center, hdim), V2S_Add(center, hdim));
+}
+
+CuboidS
+CuboidS_FromCenterDim(V3S center, V3S dim)
+{
+	V3S hdim = V3S_InvScale(dim, 2);
+	return CuboidS(V3S_Sub(center, hdim), V3S_Add(center, hdim));
+}
+
+HypercuboidS
+HypercuboidS_FromCenterDim(V4S center, V4S dim)
+{
+	V4S hdim = V4S_InvScale(dim, 2);
+	return HypercuboidS(V4S_Sub(center, hdim), V4S_Add(center, hdim));
+}
+
+bool
+Rect_ContainsPoint(Rect r, V2 v)
+{
+	return (v.x >= r.min.x && v.x <= r.max.x &&
+					v.y >= r.min.y && v.y <= r.max.y);
+}
+
+bool
+Cuboid_ContainsPoint(Cuboid c, V3 v)
+{
+	return (v.x >= c.min.x && v.x <= c.max.x &&
+					v.y >= c.min.y && v.y <= c.max.y &&
+					v.z >= c.min.z && v.z <= c.max.z);
+}
+
+bool
+Hypercuboid_ContainsPoint(Hypercuboid c, V4 v)
+{
+	return (v.x >= c.min.x && v.x <= c.max.x &&
+					v.y >= c.min.y && v.y <= c.max.y &&
+					v.z >= c.min.z && v.z <= c.max.z &&
+					v.w >= c.min.w && v.w <= c.max.w);
+}
+
+bool
+RectS_ContainsPoint(RectS r, V2S v)
+{
+	return (v.x >= r.min.x && v.x <= r.max.x &&
+					v.y >= r.min.y && v.y <= r.max.y);
+}
+
+bool
+CuboidS_ContainsPoint(CuboidS c, V3S v)
+{
+	return (v.x >= c.min.x && v.x <= c.max.x &&
+					v.y >= c.min.y && v.y <= c.max.y &&
+					v.z >= c.min.z && v.z <= c.max.z);
+}
+
+bool
+HypercuboidS_ContainsPoint(HypercuboidS c, V4S v)
+{
+	return (v.x >= c.min.x && v.x <= c.max.x &&
+					v.y >= c.min.y && v.y <= c.max.y &&
+					v.z >= c.min.z && v.z <= c.max.z &&
+					v.w >= c.min.w && v.w <= c.max.w);
+}
+
+#define M2_Row(M, N) ((M).row[N])
+#define M3_Row(M, N) ((M).row[N])
+#define M4_Row(M, N) ((M).row[N])
+
+#define M2_Col(M, N) (V2((M).row[0].e[N], (M).row[1].e[N]))
+#define M3_Col(M, N) (V3((M).row[0].e[N], (M).row[1].e[N], (M).row[2].e[N]))
+#define M4_Col(M, N) (V4((M).row[0].e[N], (M).row[1].e[N], (M).row[2].e[N], (M).row[3].e[N]))
+
+#define M2_E(M, R, C) ((M).row[R].e[C])
+#define M3_E(M, R, C) ((M).row[R].e[C])
+#define M4_E(M, R, C) ((M).row[R].e[C])
 
 M2
-M2_FromRows(V2 r0, V2 r1)
+M2_FromCols(V2 c0, V2 c1)
 {
-	return M2(V2(r0.x, r1.x),
-						V2(r0.y, r1.y));
+	return M2(V2(c0.x, c1.x),
+						V2(c0.y, c1.y));
 }
 
 M3
-M3_FromRows(V3 r0, V3 r1, V3 r2)
+M3_FromCols(V3 c0, V3 c1, V3 c2)
 {
-	return M3(V3(r0.x, r1.x, r2.x),
-						V3(r0.y, r1.y, r2.y),
-						V3(r0.z, r1.z, r2.z));
+	return M3(V3(c0.x, c1.x, c2.x),
+						V3(c0.y, c1.y, c2.y),
+						V3(c0.z, c1.z, c2.z));
 }
 
 M4
-M4_FromRows(V4 r0, V4 r1, V4 r2, V4 r3)
+M4_FromCols(V4 c0, V4 c1, V4 c2, V4 c3)
 {
-	return M4(V4(r0.x, r1.x, r2.x, r3.x),
-						V4(r0.y, r1.y, r2.y, r3.y),
-						V4(r0.z, r1.z, r2.z, r2.z),
-						V4(r0.w, r1.w, r2.w, r2.w));
+	return M4(V4(c0.x, c1.x, c2.x, c3.x),
+						V4(c0.y, c1.y, c2.y, c3.y),
+						V4(c0.z, c1.z, c2.z, c3.z),
+						V4(c0.w, c1.w, c2.w, c3.w));
 }
 
 M2
 M2_Transpose(M2 m)
 {
-	return M2_FromRows(m.i, m.j);
+	return M2(M2_Col(m, 0),
+						M2_Col(m, 1));
 }
 
 M3
 M3_Transpose(M3 m)
 {
-	return M3_FromRows(m.i, m.j, m.k);
+	return M3(M3_Col(m, 0),
+						M3_Col(m, 1),
+						M3_Col(m, 2));
 }
 
 M4
 M4_Transpose(M4 m)
 {
-	return M4_FromRows(m.i, m.j, m.k, m.l);
+	return M4(M4_Col(m, 0),
+						M4_Col(m, 1),
+						M4_Col(m, 2),
+						M4_Col(m, 3));
 }
 
 M2
 M2_Add(M2 m0, M2 m1)
 {
-	return M2(V2_Add(m0.i, m1.i), V2_Add(m0.j, m1.j));
+	return M2(V2_Add(M2_Row(m0, 0), M2_Row(m1, 0)),
+						V2_Add(M2_Row(m0, 1), M2_Row(m1, 1)));
 }
 
 M3
 M3_Add(M3 m0, M3 m1)
 {
-	return M3(V3_Add(m0.i, m1.i), V3_Add(m0.j, m1.j), V3_Add(m0.k, m1.k));
+	return M3(V3_Add(M3_Row(m0, 0), M3_Row(m1, 0)),
+						V3_Add(M3_Row(m0, 1), M3_Row(m1, 1)),
+						V3_Add(M3_Row(m0, 2), M3_Row(m1, 2)));
 }
 
 M4
 M4_Add(M4 m0, M4 m1)
 {
-	return M4(V4_Add(m0.i, m1.i), V4_Add(m0.j, m1.j), V4_Add(m0.k, m1.k), V4_Add(m0.l, m1.l));
+	return M4(V4_Add(M4_Row(m0, 0), M4_Row(m1, 0)),
+						V4_Add(M4_Row(m0, 1), M4_Row(m1, 1)),
+						V4_Add(M4_Row(m0, 2), M4_Row(m1, 2)),
+						V4_Add(M4_Row(m0, 3), M4_Row(m1, 3)));
 }
 
 M2
 M2_Sub(M2 m0, M2 m1)
 {
-	return M2(V2_Sub(m0.i, m1.i), V2_Sub(m0.j, m1.j));
+	return M2(V2_Sub(M2_Row(m0, 0), M2_Row(m1, 0)),
+						V2_Sub(M2_Row(m0, 1), M2_Row(m1, 1)));
 }
 
 M3
 M3_Sub(M3 m0, M3 m1)
 {
-	return M3(V3_Sub(m0.i, m1.i), V3_Sub(m0.j, m1.j), V3_Sub(m0.k, m1.k));
+	return M3(V3_Sub(M3_Row(m0, 0), M3_Row(m1, 0)),
+						V3_Sub(M3_Row(m0, 1), M3_Row(m1, 1)),
+						V3_Sub(M3_Row(m0, 2), M3_Row(m1, 2)));
 }
 
 M4
 M4_Sub(M4 m0, M4 m1)
 {
-	return M4(V4_Sub(m0.i, m1.i), V4_Sub(m0.j, m1.j), V4_Sub(m0.k, m1.k), V4_Sub(m0.l, m1.l));
+	return M4(V4_Sub(M4_Row(m0, 0), M4_Row(m1, 0)),
+						V4_Sub(M4_Row(m0, 1), M4_Row(m1, 1)),
+						V4_Sub(M4_Row(m0, 2), M4_Row(m1, 2)),
+						V4_Sub(M4_Row(m0, 3), M4_Row(m1, 3)));
 }
 
 M2
 M2_Hadamard(M2 m0, M2 m1)
 {
-	return M2(V2_Hadamard(m0.i, m1.i), V2_Hadamard(m0.j, m1.j));
+	return M2(V2_Hadamard(M2_Row(m0, 0), M2_Row(m1, 0)),
+						V2_Hadamard(M2_Row(m0, 1), M2_Row(m1, 1)));
 }
 
 M3
 M3_Hadamard(M3 m0, M3 m1)
 {
-	return M3(V3_Hadamard(m0.i, m1.i), V3_Hadamard(m0.j, m1.j), V3_Hadamard(m0.k, m1.k));
+	return M3(V3_Hadamard(M3_Row(m0, 0), M3_Row(m1, 0)),
+						V3_Hadamard(M3_Row(m0, 1), M3_Row(m1, 1)),
+						V3_Hadamard(M3_Row(m0, 2), M3_Row(m1, 2)));
 }
 
 M4
 M4_Hadamard(M4 m0, M4 m1)
 {
-	return M4(V4_Hadamard(m0.i, m1.i), V4_Hadamard(m0.j, m1.j), V4_Hadamard(m0.k, m1.k), V4_Hadamard(m0.l, m1.l));
+	return M4(V4_Hadamard(M4_Row(m0, 0), M4_Row(m1, 0)),
+						V4_Hadamard(M4_Row(m0, 1), M4_Row(m1, 1)),
+						V4_Hadamard(M4_Row(m0, 2), M4_Row(m1, 2)),
+						V4_Hadamard(M4_Row(m0, 3), M4_Row(m1, 3)));
 }
 
 M2
 M2_Scale(M2 m0, f32 n)
 {
-	return M2(V2_Scale(m0.i, n), V2_Scale(m0.j, n));
+	return M2(V2_Scale(M2_Row(m0, 0), n),
+						V2_Scale(M2_Row(m0, 1), n));
 }
 
 M3
 M3_Scale(M3 m0, f32 n)
 {
-	return M3(V3_Scale(m0.i, n), V3_Scale(m0.j, n), V3_Scale(m0.k, n));
+	return M3(V3_Scale(M3_Row(m0, 0), n),
+						V3_Scale(M3_Row(m0, 1), n),
+						V3_Scale(M3_Row(m0, 2), n));
 }
 
 M4
 M4_Scale(M4 m0, f32 n)
 {
-	return M4(V4_Scale(m0.i, n), V4_Scale(m0.j, n), V4_Scale(m0.k, n), V4_Scale(m0.l, n));
+	return M4(V4_Scale(M4_Row(m0, 0), n),
+						V4_Scale(M4_Row(m0, 1), n),
+						V4_Scale(M4_Row(m0, 2), n),
+						V4_Scale(M4_Row(m0, 3), n));
 }
 
 V2
 M2_Mul(M2 m, V2 v)
 {
-	V2 r0 = M2_Row(m, 0);
-	V2 r1 = M2_Row(m, 1);
-	return V2(V2_Inner(v, r0), V2_Inner(v, r1));
+	return V2(V2_Inner(v, M2_Row(m, 0)), V2_Inner(v, M2_Row(m, 1)));
 }
 
 V3
 M3_Mul(M3 m, V3 v)
 {
-	V3 r0 = M3_Row(m, 0);
-	V3 r1 = M3_Row(m, 1);
-	V3 r2 = M3_Row(m, 2);
-	return V3(V3_Inner(v, r0), V3_Inner(v, r1), V3_Inner(v, r2));
+	return V3(V3_Inner(v, M3_Row(m, 0)), V3_Inner(v, M3_Row(m, 1)), V3_Inner(v, M3_Row(m, 2)));
 }
 
 V4
 M4_Mul(M4 m, V4 v)
 {
-	V4 r0 = M4_Row(m, 0);
-	V4 r1 = M4_Row(m, 1);
-	V4 r2 = M4_Row(m, 2);
-	V4 r3 = M4_Row(m, 3);
-	return V4(V4_Inner(v, r0), V4_Inner(v, r1), V4_Inner(v, r2), V4_Inner(v, r3));
+	return V4(V4_Inner(v, M4_Row(m, 0)), V4_Inner(v, M4_Row(m, 1)), V4_Inner(v, M4_Row(m, 2)), V4_Inner(v, M4_Row(m, 3)));
 }
 
 M2
 M2_Matmul(M2 m0, M2 m1)
 {
-	V2 r0 = M2_Row(m0, 0);
-	V2 r1 = M2_Row(m0, 1);
+	V2 c0 = M2_Col(m1, 0);
+	V2 c1 = M2_Col(m1, 1);
 
-	M2 result;
-	result.i = V2(V2_Inner(m1.i, r0), V2_Inner(m1.i, r1));
-	result.j = V2(V2_Inner(m1.j, r0), V2_Inner(m1.j, r1));
-
-	return result;
+	return M2(V2(V2_Inner(M2_Row(m0, 0), c0), V2_Inner(M2_Row(m0, 0), c1)),
+						V2(V2_Inner(M2_Row(m0, 1), c0), V2_Inner(M2_Row(m0, 1), c1)));
 }
 
 M3
 M3_Matmul(M3 m0, M3 m1)
 {
-	V3 r0 = M3_Row(m0, 0);
-	V3 r1 = M3_Row(m0, 1);
-	V3 r2 = M3_Row(m0, 2);
+	V3 c0 = M3_Col(m1, 0);
+	V3 c1 = M3_Col(m1, 1);
+	V3 c2 = M3_Col(m1, 2);
 
-	M3 result;
-	result.i = V3(V3_Inner(m1.i, r0), V3_Inner(m1.i, r1), V3_Inner(m1.i, r2));
-	result.j = V3(V3_Inner(m1.j, r0), V3_Inner(m1.j, r1), V3_Inner(m1.j, r2));
-	result.k = V3(V3_Inner(m1.k, r0), V3_Inner(m1.k, r1), V3_Inner(m1.k, r2));
-
-	return result;
+	return M3(V3(V3_Inner(M3_Row(m0, 0), c0), V3_Inner(M3_Row(m0, 0), c1), V3_Inner(M3_Row(m0, 0), c2)),
+						V3(V3_Inner(M3_Row(m0, 1), c0), V3_Inner(M3_Row(m0, 1), c1), V3_Inner(M3_Row(m0, 1), c2)),
+						V3(V3_Inner(M3_Row(m0, 2), c0), V3_Inner(M3_Row(m0, 2), c1), V3_Inner(M3_Row(m0, 2), c2)));
 }
 
 M4
 M4_Matmul(M4 m0, M4 m1)
 {
-	V4 r0 = M4_Row(m0, 0);
-	V4 r1 = M4_Row(m0, 1);
-	V4 r2 = M4_Row(m0, 2);
-	V4 r3 = M4_Row(m0, 3);
+	V4 c0 = M4_Col(m1, 0);
+	V4 c1 = M4_Col(m1, 1);
+	V4 c2 = M4_Col(m1, 2);
+	V4 c3 = M4_Col(m1, 3);
 
-	M4 result;
-	result.i = V4(V4_Inner(m1.i, r0), V4_Inner(m1.i, r1), V4_Inner(m1.i, r2), V4_Inner(m1.i, r3));
-	result.j = V4(V4_Inner(m1.j, r0), V4_Inner(m1.j, r1), V4_Inner(m1.j, r2), V4_Inner(m1.j, r3));
-	result.k = V4(V4_Inner(m1.k, r0), V4_Inner(m1.k, r1), V4_Inner(m1.k, r2), V4_Inner(m1.k, r3));
-	result.l = V4(V4_Inner(m1.l, r0), V4_Inner(m1.l, r1), V4_Inner(m1.l, r2), V4_Inner(m1.l, r3));
-
-	return result;
+	return M4(V4(V4_Inner(M4_Row(m0, 0), c0), V4_Inner(M4_Row(m0, 0), c1), V4_Inner(M4_Row(m0, 0), c2), V4_Inner(M4_Row(m0, 0), c3)),
+						V4(V4_Inner(M4_Row(m0, 1), c0), V4_Inner(M4_Row(m0, 1), c1), V4_Inner(M4_Row(m0, 1), c2), V4_Inner(M4_Row(m0, 1), c3)),
+						V4(V4_Inner(M4_Row(m0, 2), c0), V4_Inner(M4_Row(m0, 2), c1), V4_Inner(M4_Row(m0, 2), c2), V4_Inner(M4_Row(m0, 2), c3)),
+						V4(V4_Inner(M4_Row(m0, 3), c0), V4_Inner(M4_Row(m0, 3), c1), V4_Inner(M4_Row(m0, 3), c2), V4_Inner(M4_Row(m0, 3), c3)));
 }
