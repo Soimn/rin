@@ -32,12 +32,41 @@ typedef u8 bool;
 #define true 1
 #define false 0
 
+typedef float f32;
+typedef double f64;
+
 typedef struct String
 {
 	u8* data;
 	umm size;
 } String;
 
+#define CONCAT__1(X, Y) X##Y
+#define CONCAT__2(X, Y) CONCAT__1(X, Y)
+#define CONCAT__3(X, Y) CONCAT__2(X, Y)
+#define CONCAT__4(X, Y) CONCAT__3(X, Y)
+#define CONCAT__5(X, Y) CONCAT__4(X, Y)
+#define CONCAT__6(X, Y) CONCAT__5(X, Y)
+#define CONCAT(X, Y) CONCAT__6(X, Y)
+
+#define STATIC_ASSERT(EX) static struct { int static_assert_failed : ((EX) ? 1 : -1); } CONCAT(StaticAssert_, CONCAT(__LINE__, CONCAT(_, __COUNT__)))
+#define ASSERT(EX) ((EX) ? 1 : (__debugbreak(), *(volatile int*)0 = 0))
+#define NOT_IMPLEMENTED ASSERT(!"NOT_IMPLEMENTED")
+
+#define ARRAY_SIZE(A) (sizeof(A)/sizeof(0[A]))
+
+typedef struct Identifier
+{
+	u32 _value;
+} Identifier;
+
+typedef struct String_Lit
+{
+	u32 _value;
+} String_Lit;
+
 #include "string.h"
+#include "int.h"
 #include "memory.h"
 #include "lexer.h"
+#include "ast.h"
