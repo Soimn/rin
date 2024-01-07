@@ -1,12 +1,14 @@
-typedef signed __int8  i8;
-typedef signed __int16 i16;
-typedef signed __int32 i32;
-typedef signed __int64 i64;
+#include <intrin.h>
 
-#define I8_MIN   (i8)(0x80)
-#define I16_MIN (i16)(0x8000)
-#define I32_MIN (i32)(0x80000000)
-#define I64_MIN (i64)(0x8000000000000000)
+typedef signed __int8  s8;
+typedef signed __int16 s16;
+typedef signed __int32 s32;
+typedef signed __int64 s64;
+
+#define S8_MIN   (s8)(0x80)
+#define S16_MIN (s16)(0x8000)
+#define S32_MIN (s32)(0x80000000)
+#define S64_MIN (s64)(0x8000000000000000)
 
 #define I8_MAX   (i8)(0x7F)
 #define I16_MAX (i16)(0x7FFF)
@@ -23,10 +25,19 @@ typedef unsigned __int64 u64;
 #define U32_MAX (u32)(0xFFFFFFFF)
 #define U64_MAX (u64)(0xFFFFFFFFFFFFFFFF)
 
-typedef i64 imm;
+typedef s64 smm;
 typedef u64 umm;
 
+#define SMM_MIN S64_MIN
+#define SMM_MAX S64_MAX
+#define UMM_MAX U64_MAX
+
+typedef s64 sint;
 typedef u64 uint;
+
+#define SINT_MIN S64_MIN
+#define SINT_MAX S64_MAX
+#define UINT_MAX U64_MAX
 
 typedef u8 bool;
 #define true 1
@@ -34,12 +45,6 @@ typedef u8 bool;
 
 typedef float f32;
 typedef double f64;
-
-typedef struct String
-{
-	u8* data;
-	umm size;
-} String;
 
 #define CONCAT__1(X, Y) X##Y
 #define CONCAT__2(X, Y) CONCAT__1(X, Y)
@@ -50,23 +55,26 @@ typedef struct String
 #define CONCAT(X, Y) CONCAT__6(X, Y)
 
 #define STATIC_ASSERT(EX) static struct { int static_assert_failed : ((EX) ? 1 : -1); } CONCAT(StaticAssert_, CONCAT(__LINE__, CONCAT(_, __COUNT__)))
+
 #define ASSERT(EX) ((EX) ? 1 : (__debugbreak(), *(volatile int*)0 = 0))
 #define NOT_IMPLEMENTED ASSERT(!"NOT_IMPLEMENTED")
 
+#define ALIGNOF(T) __alignof(T)
+
 #define ARRAY_SIZE(A) (sizeof(A)/sizeof(0[A]))
 
-typedef struct Identifier
-{
-	u32 _value;
-} Identifier;
+#define IS_POW2(N) (((N)&((N)-1)) == 0 && (N) != 0)
 
-typedef struct String_Lit
+typedef struct String
 {
-	u32 _value;
-} String_Lit;
+  u8* data;
+  u64 size;
+} String;
 
-#include "string.h"
-#include "int.h"
 #include "memory.h"
+#include "int.h"
+#include "float.h"
+#include "string.h"
 #include "lexer.h"
 #include "ast.h"
+#include "parser.h"

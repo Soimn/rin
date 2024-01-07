@@ -1,11 +1,47 @@
-#define TOKEN_BLOCK(IDX) ((IDX) << 4)
+typedef u32 Text_Pos;
+
+#define TOKEN__BLOCK(N) ((N) << 4)
 
 typedef enum Token_Kind
 {
-	Token_Invalid = 0,
-	Token_EndOfFile,
-  
-  Token__FirstMulLevel = TOKEN_BLOCK(2),
+  Token_Invalid     = 0,
+  Token_EndOfStream = 1,
+
+  Token_OpenParen,
+  Token_CloseParen,
+  Token_OpenBracket,
+  Token_CloseBracket,
+  Token_OpenBrace,
+  Token_CloseBrace,
+  Token_Qmark,
+  Token_Colon,
+  Token_Comma,
+  Token_Semicolon,
+  Token_Hat,
+  Token_Pound,
+  Token_Cash,
+  Token_At,
+
+  Token_Period,
+  Token_Elipsis,
+  Token_PeriodParen,
+  Token_PeriodBracket,
+  Token_PeriodBrace,
+  Token_TripleMinus,
+  Token_Arrow,
+
+  Token_Underscore,
+
+  Token_Ident,
+  Token_String,
+  Token_Int,
+  Token_Float,
+
+  Token_Not,
+  Token_Equals,
+
+  Token__FirstBinaryOp = TOKEN__BLOCK(9),
+  Token__FirstMulLevel = Token__FirstBinaryOp,
   Token_Star = Token__FirstMulLevel,
   Token_Slash,
   Token_Mod,
@@ -15,32 +51,33 @@ typedef enum Token_Kind
   Token_GeGeGe,
   Token__PastLastMulLevel,
 
-  Token__FirstAddLevel = TOKEN_BLOCK(3),
+  Token__FirstAddLevel = TOKEN__BLOCK(10),
   Token_Plus = Token__FirstAddLevel,
   Token_Minus,
   Token_Or,
   Token_Tilde,
   Token__PastLastAddLevel,
 
-  Token__FirstCmpLevel = TOKEN_BLOCK(4),
+  Token__FirstCmpLevel = TOKEN__BLOCK(11),
   Token_EqualsEQ = Token__FirstCmpLevel,
-	Token_NotEQ,
+  Token_NotEQ,
   Token_Le,
   Token_LeEQ,
   Token_Ge,
   Token_GeEQ,
   Token__PastLastCmpLevel,
 
-  Token__FirstAndLevel = TOKEN_BLOCK(5),
+  Token__FirstAndLevel = TOKEN__BLOCK(12),
   Token_AndAnd = Token__FirstAndLevel,
-  Token__PastLastAndLevel,
+  Token__PastAndLevel,
 
-  Token__FirstOrLevel = TOKEN_BLOCK(6),
+  Token__FirstOrLevel = TOKEN__BLOCK(13),
   Token_OrOr = Token__FirstOrLevel,
   Token__PastLastOrLevel,
+  Token__PastLastBinaryOp = Token__PastLastOrLevel,
 
-	Token__FirstAssignment = TOKEN_BLOCK(10),
-  Token__FirstMulLevelAssignment = Token__FirstAssignment,
+  Token__FirstBinaryAssignment = TOKEN__BLOCK(27),
+  Token__FirstMulLevelAssignment = Token__FirstBinaryAssignment,
   Token_StarEQ = Token__FirstMulLevelAssignment,
   Token_SlashEQ,
   Token_ModEQ,
@@ -50,352 +87,485 @@ typedef enum Token_Kind
   Token_GeGeGeEQ,
   Token__PastLastMulLevelAssignment,
 
-  Token__FirstAddLevelAssignment = TOKEN_BLOCK(11),
+  Token__FirstAddLevelAssignment = TOKEN__BLOCK(28),
   Token_PlusEQ = Token__FirstAddLevelAssignment,
   Token_MinusEQ,
   Token_OrEQ,
-	Token_TildeEQ,
+  Token_TildeEQ,
   Token__PastLastAddLevelAssignment,
 
-  Token__FirstAndLevelAssignment = TOKEN_BLOCK(13),
-  Token_AndAndEQ = Token__FirstAndLevelAssignment,
-  Token__PastLastAndLevelAssignment,
+  Token__PastLastBinaryAssignment = Token__PastLastAddLevelAssignment,
 
-  Token__FirstOrLevelAssignment = TOKEN_BLOCK(14),
-  Token_OrOrEQ = Token__FirstOrLevelAssignment,
-  Token__PastLastOrLevelAssignment,
-	Token__PastLastAssignment = Token__PastLastOrLevelAssignment,
-
-	Token__FirstKeyword = Token__PastLastAssignment,
-	Token_True,
-	Token_False,
-	Token_If,
-	Token_While,
-	Token_When,
-	Token_Break,
-	Token_Continue,
-	Token_Return,
-	Token_Struct,
-	Token_Union,
-	Token_Proc,
-	Token__PastLastKeyword,
-
-	Token_Int,
-	Token_Float,
-  Token_String,
-	Token_Ident,
-
-  Token_OpenParen,
-  Token_CloseParen,
-  Token_OpenBracket,
-  Token_CloseBracket,
-  Token_OpenBrace,
-  Token_CloseBrace,
-  Token_Period,
-	Token_Elipsis,
-  Token_Colon,
-  Token_Comma,
-  Token_Semicolon,
-  Token_Hat,
-  Token_At,
-	Token_Pound,
-	Token_Cash,
-	Token_Underscore,
-  Token_Arrow,
-  Token_PlusPlus,
-  Token_MinusMinus,
-  Token_TripleMinus,
-  Token_Qmark,
-
-	Token_Equals = TOKEN_BLOCK(36),
-	Token_Not,
+  Token__FirstKeyword,
+  Token_True = Token__FirstKeyword,
+  Token_False,
+  Token_If,
+  Token_Else,
+  Token_While,
+  Token_For,
+  Token_Break,
+  Token_Continue,
+  Token_Return,
+  Token_Proc,
+  Token_Struct,
+  Token__PastLastKeyword,
 } Token_Kind;
 
-STATIC_ASSERT(Token__PastLastMulLevel           <= Token__FirstAddLevel);
-STATIC_ASSERT(Token__PastLastAddLevel           <= Token__FirstCmpLevel);
-STATIC_ASSERT(Token__PastLastCmpLevel           <= Token__FirstAndLevel);
-STATIC_ASSERT(Token__PastLastAndLevel           <= Token__FirstOrLevel);
-STATIC_ASSERT(Token__PastLastOrLevel            <= Token__FirstAssignment);
-STATIC_ASSERT(Token__PastLastMulLevelAssignment <= Token__FirstAddLevelAssignment);
-STATIC_ASSERT(Token__PastLastAddLevelAssignment <= Token__FirstAndLevelAssignment);
-STATIC_ASSERT(Token__PastLastAndLevelAssignment <= Token__FirstOrLevelAssignment);
+#define KEYWORD_STRING(E, S) [E - Token__FirstKeyword] = { .data = (S), .size = sizeof(S)-1 }
+String Keywords[] = {
+  KEYWORD_STRING(Token_True,     "true"),
+  KEYWORD_STRING(Token_False,    "false"),
+  KEYWORD_STRING(Token_If,       "if"),
+  KEYWORD_STRING(Token_Else,     "else"),
+  KEYWORD_STRING(Token_While,    "while"),
+  KEYWORD_STRING(Token_For,      "for"),
+  KEYWORD_STRING(Token_Break,    "break"),
+  KEYWORD_STRING(Token_Continue, "continue"),
+  KEYWORD_STRING(Token_Return,   "return"),
+  KEYWORD_STRING(Token_Proc,     "proc"),
+  KEYWORD_STRING(Token_Struct,   "struct"),
+};
+#undef KEYWORD_STRING
+STATIC_ASSERT(ARRAY_SIZE(Keywords) == Token__PastLastKeyword-Token__FirstKeyword);
 
-STATIC_ASSERT((Token_Equals ^ 512) == Token_EqualsEQ);
-STATIC_ASSERT((Token_Not    ^ 512) == Token_NotEQ);
-
+// TODO: Meassure perf diff between discriminated union vs header/body vs kind + LUT
 typedef struct Token
 {
-	Token_Kind kind;
-	u32 offset;
-	u32 offset_to_line;
-	u32 line;
-	u32 size;
+  Token_Kind kind;
+  Text_Pos pos;
 
-	union
-	{
-		Identifier ident;
-		String_Lit string;
-		i128 integer;
-		f64 floating;
-	};
+  union
+  {
+    s128 integer;
+    f64 floating;
+    String ident;
+    String string;
+  };
 } Token;
 
-// NOTE: Assumes files are no longer than 4 GB
-// NOTE: This function is written in a very convoluted, hopefully mostly branchless, way.
-//       Although this is probably a bad idea for both readability and maintainability,
-//       as well as probably being harder for the compiler to optimize, it is fun to write,
-//       so it will probably stay this way, regardless of the problems. Additionally, it
-//       would probably be smarter to do a prepass to determine token boundaries and then
-//       parse identifier, strings and numbers, instead of doing everything in one go.
-//       However, I am too lazy to go that far, and none of this really matters since
-//       the lexer is such a small part of the compilation process.
-static void
-LexFile(u8* contents)
+typedef struct Token_Array
 {
-	u8* cursor = contents;
+  Token* tokens;
+  u32 token_count;
+} Token_Array;
 
-	u32 offset_to_line = 0;
-	u32 line           = 1;
+// NOTE: All ASCII values below 0x21 (except 0) are treated as whitespace
+// NOTE: Content must be padded with 4 null terminators
+static bool
+LexFile(u8* content, Text_Pos init_pos, Arena token_arena, Token_Array* token_array)
+{
+  *token_array = (Token_Array){
+    .tokens      = Arena_PushAlignment(token_arena, ALIGNOF(Token)),
+    .token_count = 0,
+  };
 
-	for (;;)
-	{
-		for (;;)
-		{
-			if (*cursor == '\n')
-			{
-				cursor += 1;
+  for (u8* cursor = content;;)
+  {
+    for (;;)
+    {
+      if ((u8)(*cursor-1) < 0x20) ++cursor;
+      else if (cursor[0] == '/' && cursor[1] == '/')
+      {
+        // NOTE: Knock out 2's bit to make line feed less than horizontal tab (lf 10->8, tab 9->9, null 0->0)
+        while ((*cursor&0xFD) > 0x08) ++cursor;
+      }
+      else if (cursor[0] == '/' && cursor[1] == '*')
+      {
+        cursor += 2;
+        uint nesting = 1;
 
-				offset_to_line = (u32)(cursor - contents);
-				line          += 1;
-			}
-			else if (Char_IsWhitespace(*cursor))
-			{
-				cursor += 1;
-			}
-			else if (cursor[0] == '/' && cursor[1] == '/')
-			{
-				cursor += 2;
-				while (*cursor != 0 && *cursor != '\n') ++cursor;
-			}
-			else if (cursor[0] == '/' && cursor[1] == '*')
-			{
-				cursor += 2;
-				for (uint nesting = 1; nesting > 0;)
-				{
-					if      (cursor[0] == '/' && cursor[1] == '*') cursor += 2, nesting += 1;
-					else if (cursor[0] == '*' && cursor[1] == '/') cursor += 2, nesting -= 1;
-					else if (*cursor != 0)                         cursor += 1;
-					else
-					{
-						//// ERROR: Unterminated block comment
-						NOT_IMPLEMENTED;
-					}
-				}
-			}
-			else break;
-		}
+        for (;;)
+        {
+          if (cursor[0] == '/' && cursor[1] == '*')
+          {
+            nesting += 1;
+            cursor  += 2;
+          }
+          else if (cursor[0] == '*' && cursor[1] == '/')
+          {
+            nesting -= 1;
+            if (nesting == 0) break;
 
-		Token* token = 0;
-		token->kind           = Token_Invalid;
-		token->offset         = (u32)(cursor - contents);
-		token->offset_to_line = offset_to_line;
-		token->line           = line;
+            cursor  += 2;
+          }
+          else if (*cursor != 0) ++cursor;
+          else                   break;
+        }
 
-		u8 c[4] = {0};
-		for (uint i = 0; i < ARRAY_SIZE(c) && cursor[i] != 0; ++i) c[i] = cursor[i];
+        if (*cursor != 0) cursor += sizeof("*/")-1;
+        else
+        {
+          //// ERROR: Unterminated block comment
+          return false;
+        }
+      }
+      else break;
+    }
 
-		cursor += (c[0] != 0);
+    if (*cursor == 0) break;
+    else
+    {
+      Token* token = Arena_PushBytes(token_arena, sizeof(Token)); // NOTE: base is already aligned
+      token->kind = Token_Invalid;
+      token->pos  = init_pos + (Text_Pos)(cursor - content);
 
-		bool c1_rep  = (c[1] == c[0]);
-		bool c_eq[2] = {c[1] == '"', c[2] == '='};
-		u32 c_bit[2] = {c_eq[1] << 3, c_eq[2] << 3};
-		switch (c[0])
-		{
-			case 0: token->kind = Token_EndOfFile; break;
+      u8 c[4];
+      for (uint i = 0; i < 4; ++i) c[i] = cursor[i];
 
-			case '(': token->kind = Token_OpenParen;    break;
-			case ')': token->kind = Token_CloseParen;   break;
-			case '[': token->kind = Token_OpenBracket;  break;
-			case ']': token->kind = Token_CloseBracket; break;
-			case '{': token->kind = Token_OpenBrace;    break;
-			case '}': token->kind = Token_CloseBrace;   break;
-			case ':': token->kind = Token_Colon;        break;
-			case ',': token->kind = Token_Comma;        break;
-			case ';': token->kind = Token_Semicolon;    break;
-			case '^': token->kind = Token_Hat;          break;
-			case '@': token->kind = Token_At;           break;
-			case '#': token->kind = Token_Pound;        break;
-			case '$': token->kind = Token_Cash;         break;
-			case '?': token->kind = Token_Qmark;        break;
-		
-			case '*': token->kind = Token_Star  | c_bit[1]; cursor += c_eq[1]; break;
-			case '/': token->kind = Token_Slash | c_bit[1]; cursor += c_eq[1]; break;
-			case '%': token->kind = Token_Mod   | c_bit[1]; cursor += c_eq[1]; break;
-			case '~': token->kind = Token_Tilde | c_bit[1]; cursor += c_eq[1]; break;
+      switch (c[0])
+      {
+        case '(': token->kind = Token_OpenParen;    break;
+        case ')': token->kind = Token_CloseParen;   break;
+        case '[': token->kind = Token_OpenBracket;  break;
+        case ']': token->kind = Token_CloseBracket; break;
+        case '{': token->kind = Token_OpenBrace;    break;
+        case '}': token->kind = Token_CloseBrace;   break;
+        case '?': token->kind = Token_Qmark;        break;
+        case ':': token->kind = Token_Colon;        break;
+        case ',': token->kind = Token_Comma;        break;
+        case ';': token->kind = Token_Semicolon;    break;
+        case '^': token->kind = Token_Hat;          break;
+        case '#': token->kind = Token_Pound;        break;
+        case '$': token->kind = Token_Cash;         break;
+        case '@': token->kind = Token_At;           break;
 
-			case '.': token->kind = Token_Period + c1_rep; cursor += c1_rep; break;
+        case '.':
+        {
+          if      (c[1] == '.') token->kind = Token_Elipsis,       cursor += 1;
+          else if (c[1] == '(') token->kind = Token_PeriodParen,   cursor += 1;
+          else if (c[1] == '[') token->kind = Token_PeriodBracket, cursor += 1;
+          else if (c[1] == '{') token->kind = Token_PeriodBrace,   cursor += 1;
+          else                  token->kind = Token_Period;
+        } break;
 
-			case '+': token->kind = (c1_rep ? Token_PlusPlus : Token_Plus) | c_bit[1]; cursor += c_bit[1]; break;
+        case '*':
+        {
+          if (c[1] == '=') token->kind = Token_StarEQ, cursor += 1;
+          else             token->kind = Token_Star;
+        } break;
 
-			case '&': token->kind = (c1_rep ? Token_AndAnd : Token_And) | c_bit[c1_rep]; cursor += (c1_rep + c_eq[c1_rep]); break;
-			case '|': token->kind = (c1_rep ? Token_OrOr   : Token_Or)  | c_bit[c1_rep]; cursor += (c1_rep + c_eq[c1_rep]); break;
+        case '/':
+        {
+          if (c[1] == '=') token->kind = Token_SlashEQ, cursor += 1;
+          else             token->kind = Token_Slash;
+        } break;
 
-			case '!': token->kind = Token_Not    ^ (c_bit[1] << 6); cursor += c_bit[1]; break;
-			case '=': token->kind = Token_Equals ^ (c_bit[1] << 6); cursor += c_bit[1]; break;
-			
-			case '<':
-			{
-				if (c1_rep)
-				{
-					token->kind = Token_LeLe | c_bit[2];
-					cursor     += c1_rep + c_eq[2];
-				}
-				else
-				{
-					token->kind = Token_Le + c_eq[1];
-					cursor     += c_eq[1];
-				}
-			} break;
+        case '%':
+        {
+          if (c[1] == '=') token->kind = Token_ModEQ, cursor += 1;
+          else             token->kind = Token_Mod;
+        } break;
 
-			case '>':
-			{
-				if (c1_rep)
-				{
-					bool triple = (c[2] == '>');
-					bool eq = (c[2 + triple] == '=');
+        case '&':
+        {
+          if      (c[1] == '=') token->kind = Token_AndEQ,  cursor += 1;
+          else if (c[1] == '&') token->kind = Token_AndAnd, cursor += 1;
+          else                  token->kind = Token_And;
+        } break;
 
-					token->kind = (Token_GeGe + triple) | (eq << 3);
-					cursor     += c1_rep + triple + eq;
-				}
-				else
-				{
-					token->kind = Token_Ge + c_eq[1];
-					cursor     += c_eq[1];
-				}
-			} break;
+        case '<':
+        {
+          if      (c[1] == '<' && c[2] == '=') token->kind = Token_LeLeEQ, cursor += 2;
+          else if (c[1] == '<')                token->kind = Token_LeLe,   cursor += 1;
+          else if (c[1] == '=')                token->kind = Token_LeEQ,   cursor += 1;
+          else                                 token->kind = Token_Le;
+        } break;
 
-			case '-':
-			{
-				if (c1_rep)
-				{
-					bool c2_rep = (c[2] == '-');
-					token->kind = Token_MinusMinus + c2_rep;
-					cursor     += 1 + c2_rep;
-				}
-				else
-				{
-					bool arrow = (c[1] == '>');
-					token->kind = (arrow ? Token_Arrow : Token_Minus) | c_bit[1];
-					cursor     += c_bit[1] + arrow;
-				}
-			} break;
+        case '>':
+        {
+          if      (c[1] == '>' && c[2] == '>' && c[3] == '=') token->kind = Token_GeGeEQ, cursor += 3;
+          else if (c[1] == '>' && c[2] == '>')                token->kind = Token_GeGe,   cursor += 2;
+          else if (c[1] == '>' && c[2] == '=')                token->kind = Token_GeGeEQ, cursor += 2;
+          else if (c[1] == '>')                               token->kind = Token_GeGe,   cursor += 1;
+          else if (c[1] == '=')                               token->kind = Token_GeEQ,   cursor += 1;
+          else                                                token->kind = Token_Ge;
+        } break;
 
-			default:
-			{
-				if (Char_IsAlpha(c[0]) || c[0] == '_')
-				{
-					String ident = { .data = cursor };
-					while (Char_IsAlpha(*cursor) || Char_IsDigit(*cursor) || *cursor == '_') ++cursor;
-					ident.size = cursor - ident.data;
+        case '+':
+        {
+          if (c[1] == '=') token->kind = Token_PlusEQ, cursor += 1;
+          else             token->kind = Token_Plus;
+        } break;
 
-					if (ident.size == 1 && *ident.data == '_') token->kind = Token_Underscore;
-					else
-					{
-						// TODO: intern ident and check for keyword
-						NOT_IMPLEMENTED;
-					}
-				}
-				else if (Char_IsDigit(c[0]))
-				{
-					if (c[0] == '0' && (c[1] == 'x' || c[1] == 'h'))
-					{
-						bool is_float = (c[1] == 'h');
-						++cursor;
+        case '-':
+        {
+          if      (c[1] == '-' && c[2] == '-') token->kind = Token_TripleMinus, cursor += 2;
+          else if (c[1] == '>')                token->kind = Token_Arrow,       cursor += 1;
+          else if (c[1] == '=')                token->kind = Token_MinusEQ,     cursor += 1;
+          else                                 token->kind = Token_Minus;
+        } break;
 
-						i128 value;
-						uint digit_count = 0;
-						for (;; ++cursor)
-						{
-							u8 digit;
-							if (*cursor == '_') continue;
-							else if (Char_IsHexAlpha(*cursor)) digit = (*cursor&0xF) + 9;
-							else if (Char_IsDigit(*cursor))    digit = *cursor&0xF;
-							else break;
+        case '|':
+        {
+          if      (c[1] == '|') token->kind = Token_OrOr, cursor += 1;
+          else if (c[1] == '=') token->kind = Token_OrEQ, cursor += 1;
+          else                  token->kind = Token_Or;
+        } break;
 
-							value.hi = (value.hi << 4) | (value.lo >> 60)
-							value.lo = (value.lo << 4) | digit;
-							++digit_count;
-						}
+        case '~':
+        {
+          if (c[1] == '=') token->kind = Token_TildeEQ, cursor += 1;
+          else             token->kind = Token_Tilde;
+        } break;
 
-						if (is_float)
-						{
-							if (digit_count == 8)
-							{
-								token->kind = Token_Float;
-								token->floating = (F32_Bits){ .bits = (u32)value.lo }.f;
-							}
-							else if (digit_count == 16)
-							{
-								token->kind = Token_Float;
-								token->floating = (F64_Bits){ .bits = value.lo }.f;
-							}
-							else
-							{
-								//// ERROR: Invalid number of digits for hexadecimal float literal, must be either 8 or 16
-								NOT_IMPLEMENTED;
-							}
-						}
-						else
-						{
-							if (digit_count == 0)
-							{
-								//// ERROR: No digits after hexadecimal prefix in integer literal
-								NOT_IMPLEMENTED;
-							}
-							else if (digit_count > 32)
-							{
-								//// ERROR: Too many digits in hexadecimal integer literal
-								NOT_IMPLEMENTED;
-							}
-							else
-							{
-								token->kind    = Token_Int;
-								token->integer = value;
-							}
-						}
-					}
-					else
-					{
-						NOT_IMPLEMENTED;
-					}
-				}
-				else if (c[0] == '"')
-				{
-					String raw_string = { .data = cursor };
+        case '!':
+        {
+          if (c[1] == '=') token->kind = Token_NotEQ, cursor += 1;
+          else             token->kind = Token_Not;
+        } break;
 
-					while (*cursor != 0 && *cursor != '"') cursor += 1 + (cursor[0] == '\\' && cursor[1] != 0);
+        default:
+        {
+          if (Char_IsAlpha(c[0]) || c[0] == '_')
+          {
+            // NOTE: c[0] is the character before cursor
+            String identifier = { .data = cursor-1, .size = 0 };
 
-					if (*cursor == 0)
-					{
-						//// ERROR: unterminated string literal
-						NOT_IMPLEMENTED;
-					}
-					else
-					{
-						raw_string.size = cursor - raw_string.data;
-						++cursor;
+            for (; Char_IsAlpha(*cursor) || Char_IsDigit(*cursor) || *cursor == '_'; ++cursor);
+            identifier.size = cursor - identifier.data;
 
-						NOT_IMPLEMENTED;
-					}
-				}
-				else
-				{
-					//// ERROR: Invalid character
-					NOT_IMPLEMENTED;
-				}
-			} break;
-		}
+            if (identifier.size == 1 && c[0] == '_') token->kind = Token_Underscore;
+            else
+            {
+              Token_Kind kind = Token_Ident;
+              
+              for (uint i = 0; i < ARRAY_SIZE(Keywords); ++i)
+              {
+                if (String_Match(identifier, Keywords[i]))
+                {
+                  kind = i + Token__FirstKeyword;
+                  break;
+                }
+              }
 
-		token->size = (u32)(cursor - contents) - token->offset;
-	}
+              token->kind  = kind;
+              token->ident = identifier;
+            }
+          }
+          else if (Char_IsDigit(c[0]))
+          {
+            if (c[0] == '0' && c[1] == 'b')
+            {
+              cursor += 1;
+
+              uint digit_count = 0;
+              u64 parts[2]     = {0};
+              for (;; ++cursor)
+              {
+                if      (*cursor == '_')  continue;
+                else if (*cursor-'0' > 1) break;
+                else
+                {
+                  parts[digit_count >> 6] |= ((u64)(*cursor & 0x1) << (digit_count & 63));
+                  digit_count             += 1;
+                }
+              }
+
+              if (digit_count > 128)
+              {
+                //// ERROR: Binary integer literal has too many bits
+                return false;
+              }
+              else if (digit_count == 0)
+              {
+                //// ERROR: Binary integer literal has no digits
+                return false;
+              }
+              else
+              {
+                token->kind    = Token_Int;
+                token->integer = S128_FromBits(parts[0], parts[1]);
+              }
+            }
+            else if (c[0] == '0' && (c[1] == 'x' || c[1] == 'h'))
+            {
+              bool is_float = (c[1] == 'h');
+              cursor += 1;
+
+              uint digit_count = 0;
+              u64 parts[2]     = {0};
+              for (;; ++cursor)
+              {
+                u64 digit;
+                if      (*cursor == '_')                              continue;
+                else if (Char_IsDigit(*cursor))                       digit = *cursor&0xF;
+                else if ((u8)((*cursor&0xDF)-'A') <= (u8)('F' - 'A')) digit = 9 + (*cursor & 0x07);
+
+                parts[digit_count >> 4] |= digit << ((digit_count & 15) << 2);
+              }
+
+              if (is_float)
+              {
+                if (digit_count == 16)
+                {
+                  token->kind     = Token_Float;
+                  token->floating = (F64_Bits){ .bits = parts[0] }.f;
+                }
+                else if (digit_count == 8)
+                {
+                  token->kind     = Token_Float;
+                  token->floating = (F32_Bits){ .bits = (u32)parts[0] }.f;
+                }
+                else
+                {
+                  //// ERROR: Hex float literal must have exactly 8 or 16 digits (for f32 and f64 respectively)
+                  return false;
+                }
+              }
+              else
+              {
+                if (digit_count > 16)
+                {
+                  //// ERROR: Hex integer literal has too many digits
+                  return false;
+                }
+                else if (digit_count == 0)
+                {
+                  //// ERROR: Hex integer literal has no digits
+                  return false;
+                }
+                else
+                {
+                  token->kind    = Token_Int;
+                  token->integer = S128_FromBits(parts[0], parts[1]);
+                }
+              }
+            }
+            else
+            {
+              uint digit_count = 1;
+              u64 lo           = c[0]&0xF;
+              for (; digit_count < 19; ++cursor)
+              {
+                u8 digit;
+                if      (*cursor == '_')        continue;
+                else if (Char_IsDigit(*cursor)) digit = *cursor&0xF;
+                else                            break;
+
+                lo           = lo*10 + digit;
+                digit_count += 1;
+              }
+
+              s128 integer = S128_FromBits(lo, 0);
+              if (Char_IsDigit(*cursor))
+              {
+                for (;; ++cursor)
+                {
+                  u8 digit;
+                  if      (*cursor == '_')        continue;
+                  else if (Char_IsDigit(*cursor)) digit = *cursor&0xF;
+                  else                            break;
+                  
+                  bool overflow = false;
+                  integer = S128_Mul(integer, S128_FromU64(10), &overflow);
+                  integer = S128_Add(integer, S128_FromU64(digit), &overflow);
+
+                  if (overflow)
+                  {
+                    //// ERROR: Integer literal is too large
+                    return false;
+                  }
+                }
+              }
+
+              bool is_float = (*cursor == '.' || (*cursor&0xDF) == 'E');
+              if (!is_float)
+              {
+                token->kind    = Token_Int;
+                token->integer = integer;
+              }
+              else
+              {
+                u64 fraction = 0;
+                if (*cursor == '.')
+                {
+                  uint fraction_digit_count = 0;
+                  for (; fraction_digit_count < 19; ++cursor)
+                  {
+                    u8 digit;
+                    if      (*cursor == '_')        continue;
+                    else if (Char_IsDigit(*cursor)) digit = *cursor&0xF;
+                    else                            break;
+                    
+                    fraction              = fraction*10 + digit;
+                    fraction_digit_count += 1;
+                  }
+
+                  if (Char_IsDigit(*cursor))
+                  {
+                    //// ERROR: Too many digits in fractional part of floating point literal
+                    return false;
+                  }
+                }
+
+                s64 exponent = 0;
+                if ((*cursor&0xDF) == 'E')
+                {
+                  cursor += 1;
+
+                  bool is_neg = (*cursor == '-');
+                  cursor += (*cursor == '-' || *cursor == '+');
+
+                  uint exponent_digit_count = 0;
+                  for (; exponent_digit_count < 4; ++cursor)
+                  {
+                    u8 digit;
+                    if      (*cursor == '_')        continue;
+                    else if (Char_IsDigit(*cursor)) digit = *cursor&0xF;
+                    else                            break;
+                    
+                    exponent              = exponent*10 + digit;
+                    exponent_digit_count += 1;
+                  }
+
+                  if (is_neg) exponent = -exponent;
+                  
+                  if (Char_IsDigit(*cursor))
+                  {
+                    //// ERROR: Too many digits in exponent of floating point literal
+                    return false;
+                  }
+                }
+
+                // TODO: Assemble float
+                NOT_IMPLEMENTED;
+              }
+            }
+          }
+          else if (c[0] == '"')
+          {
+            String raw_string = { .data = cursor, .size = 0 };
+
+            while (*cursor != 0 && *cursor != '"')
+            {
+              if (cursor[0] == '\\' && cursor[1] != 0) cursor += 2;
+              else                                     cursor += 1;
+            }
+
+            if (*cursor != '"')
+            {
+              //// ERROR: Unterminated string literal
+              return false;
+            }
+            else
+            {
+              raw_string.size = cursor - raw_string.data;
+
+              // TODO: escaped characters
+
+              token->kind   = Token_String;
+              token->string = raw_string; // TODO: where to store strings?
+            }
+          }
+          else
+          {
+            //// ERROR: Unknown symbol
+            return false;
+          }
+        } break;
+      }
+    }
+  }
+
+  return true;
 }

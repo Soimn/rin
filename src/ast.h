@@ -1,164 +1,234 @@
-#define EXPR_BLOCK(IDX) ((IDX) << 4)
+#define AST__EXPR_BLOCK(N) ((N) << 4)
+#define AST__BLOCK_IDX(K) ((K) >> 4)
 
-typedef enum Expr_Kind
+#define AST_IS_BINARY_EXPR(K) (uint)((K)-AST__FirstBinary) < (uint)(AST__PastLastBinary-AST__FirstBinary)
+
+typedef enum AST_Kind
 {
-	Expr_Invalid = 0,
+  AST_Invalid = 0,
 
-	Expr__FirstTypePrefix,
-	Expr_PointerTo = Expr__FirstTypePrefix,
-	Expr_SliceOf,
-	Expr_ArrayOf,
-	Expr__PastLastTypePrefix,
+  AST__FirstExpr = AST__EXPR_BLOCK(1),
+  AST__FirstPrimary = AST__FirstExpr,
+  AST_Ident = AST__FirstPrimary,
+  AST_String,
+  AST_Int,
+  AST_Float,
+  AST_Bool,
+  AST_ProcType,
+  AST_ProcLit,
+  AST_StructType,
+  AST_Compound,
+  AST__PastLastPrimary,
 
-	Expr__FirstPostfix,
-	Expr_Subscript = Expr__FirstPostfix,
-	Expr_Slice,
-	Expr_Call,
-	Expr_Member,
-	Expr_Deref,
-	Expr_StructLit,
-	Expr_ArrayLit,
-	Expr__PastLastPostfix,
+  AST__FirstTypePrefix = AST__EXPR_BLOCK(2),
+  AST_PointerType = AST__FirstTypePrefix, // NOTE: This is a Unary_Expr
+  AST_ArrayType,
+  AST_SliceType,                          // NOTE: This is a Unary_Expr
+  AST__PastLastTypePrefix,
 
-	Expr__FirstPrefix,
-	Expr_Pos = Expr__FirstPrefix,
-	Expr_Neg,
-	Expr_BitNot,
-	Expr_Not,
-	Expr_Ref,
-	Expr__PastLastPrefix,
+  AST__FirstPostfix = AST__EXPR_BLOCK(3),
+  AST_Subscript = AST__FirstPostfix,
+  AST_Slice,
+  AST_Call,
+  AST_Member,
+  AST_Deref,                              // NOTE: This is a Unary_Expr
+  AST_StructLit,
+  AST_ArrayLit,
+  AST__PastLastPostfix,
 
-	Expr__FirstBinary = EXPR_BLOCK(2),
-	Expr__FirstMulLevel = Expr__FirstBinary,
-	Expr_Mul = Expr__FirstMulLevel,
-	Expr_Div,
-	Expr_Mod,
-	Expr_BitAnd,
-	Expr_BitShr,
-	Expr_BitSar,
-	Expr_BitShl,
-	Expr__PastLastMulLevel,
+  AST__FirstPrefix = AST__EXPR_BLOCK(4),
+  AST_Pos = AST__FirstPrefix,
+  AST_Neg,
+  AST_BitNot,
+  AST_Not,
+  AST_Ref,
+  AST__PastLastPrefix,
 
-	Expr__FirstAddLevel = EXPR_BLOCK(3),
-	Expr_Add = Expr__FirstAddLevel,
-	Expr_Sub,
-	Expr_BitOr,
-	Expr_BitXor,
-	Expr__PastLastAddLevel,
+  AST__FirstBinary = AST__EXPR_BLOCK(9),
+  AST__FirstMulLevel = AST__FirstBinary,
+  AST_Mul = AST__FirstMulLevel,
+  AST_Div,
+  AST_Mod,
+  AST_BitAnd,
+  AST_BitShl,
+  AST_BitShr,
+  AST_BitSar,
+  AST__PastLastMulLevel,
 
-	Expr__FirstCmpLevel = EXPR_BLOCK(4),
-	Expr_CmpEQ = Expr__FirstCmpLevel,
-	Expr_CmpNEQ,
-	Expr_CmpLe,
-	Expr_CmpLeEQ,
-	Expr_CmpGe,
-	Expr_CmpGeEQ,
-	Expr__PastLastCmpLevel,
+  AST__FirstAddLevel = AST__EXPR_BLOCK(10),
+  AST_Add = AST__FirstAddLevel,
+  AST_Sub,
+  AST_BitOr,
+  AST_BitXor,
+  AST__PastLastAddLevel,
 
-	Expr__FirstAndLevel = EXPR_BLOCK(5),
-	Expr_And = Expr__FirstAndLevel,
-	Expr__PastLastAndLevel,
+  AST__FirstCmpLevel = AST__EXPR_BLOCK(11),
+  AST_CmpEQ = AST__FirstCmpLevel,
+  AST_CmpNotEQ,
+  AST_CmpLe,
+  AST_CmpLeEQ,
+  AST_CmpGe,
+  AST_CmpGeEQ,
+  AST__PastLastCmpLevel,
 
-	Expr__FirstOrLevel = EXPR_BLOCK(6),
-	Expr_Or = Expr__FirstOrLevel,
-	Expr__PastLastOrLevel,
-	Expr__PastLastBinary = Expr__PastLastOrLevel,
+  AST__FirstAndLevel = AST__EXPR_BLOCK(12),
+  AST_And = AST__FirstAndLevel,
+  AST__PastLastAndLevel,
 
-	Expr__FirstCondLevel,
-	Expr_Cond = Expr__FirstCondLevel,
-	Expr__PastLastCondLevel,
+  AST__FirstOrLevel = AST__EXPR_BLOCK(13),
+  AST_Or = AST__FirstOrLevel,
+  AST__PastLastOrLevel,
+  AST__PastLastBinary = AST__PastLastOrLevel,
 
-	Expr_Ident,
-	Expr_String,
-	Expr_Int, // TODO:
-	Expr_Comp,
-} Expr_Kind;
+  AST_Conditional = AST__EXPR_BLOCK(14),
 
-STATIC_ASSERT(Expr__PastLastPostfix  <= Expr__FirstBinary);
-STATIC_ASSERT(Expr__PastLastMulLevel <= Expr__FirstAddLevel);
-STATIC_ASSERT(Expr__PastLastAddLevel <= Expr__FirstCmpLevel);
-STATIC_ASSERT(Expr__PastLastCmpLevel <= Expr__FirstAndLevel);
-STATIC_ASSERT(Expr__PastLastAndLevel <= Expr__FirstOrLevel);
+  AST__PastLastExpr,
 
-typedef struct Expr Expr;
-typedef struct Expr
+  AST__FirstStmnt,
+  AST_Block = AST__FirstStmnt,
+  AST_If,
+  AST_While,
+  AST_Assignment,
+  AST__PastLastStmnt,
+} AST_Kind;
+
+STATIC_ASSERT(AST__PastLastPrimary    <= AST__FirstTypePrefix);
+STATIC_ASSERT(AST__PastLastTypePrefix <= AST__FirstPostfix);
+STATIC_ASSERT(AST__PastLastPostfix    <= AST__FirstPrefix);
+STATIC_ASSERT(AST__PastLastPrefix     <= AST__FirstBinary);
+STATIC_ASSERT(AST__PastLastMulLevel   <= AST__FirstAddLevel);
+STATIC_ASSERT(AST__PastLastAddLevel   <= AST__FirstCmpLevel);
+STATIC_ASSERT(AST__PastLastCmpLevel   <= AST__FirstAndLevel);
+STATIC_ASSERT(AST__PastLastAndLevel   <= AST__FirstOrLevel);
+
+typedef struct AST
 {
-	Expr_Kind kind;
+  AST_Kind kind;
+  Text_Pos text_pos;
+} AST;
 
-	union
-	{
-		Identifier ident_expr;
-		String_Lit string_expr;
+#define AST_HEADER union { AST header; struct AST; }
 
-		Expr* unary_expr;
-
-		struct 
-		{
-			Expr* left;
-			Expr* right;
-		} binary_expr;
-
-		struct
-		{
-			Expr* type;
-			Expr* size;
-		} array_of_expr;
-
-		struct
-		{
-			Expr* array;
-			Expr* idx;
-		} subcript_expr;
-
-		struct
-		{
-			Expr* array;
-			Expr* start_idx;
-			Expr* past_end_idx;
-		} slice_expr;
-
-		struct
-		{
-			Expr* pointer;
-			// args
-		} call_expr;
-
-		struct
-		{
-			Expr* collection;
-			Expr* member;
-		} member_expr;
-
-		struct
-		{
-			Expr* type;
-			// args
-		} struct_lit_expr;
-
-		struct
-		{
-			Expr* type;
-			// args
-		} array_lit_expr;
-	};
-} Expr;
-
-typedef enum Stmnt_Kind
+typedef struct Ident_Expr
 {
-	Stmnt_Block,
-	Stmnt_Var,
-	Stmnt_Const,
-	Stmnt_If,
-	Stmnt_While,
-	Stmnt_Break,
-	Stmnt_Continue,
-	Stmnt_Return,
-	Stmnt_Expr,
-	Stmnt_Assign,
-} Stmnt_Kind;
+  AST_HEADER;
+  String value;
+} Ident_Expr;
 
-typedef struct Stmnt Stmnt;
-typedef struct Stmnt
+typedef struct String_Expr
 {
-	Stmnt_Kind kind;
-} Stmnt;
+  AST_HEADER;
+  String value;
+} String_Expr;
+
+typedef struct Int_Expr
+{
+  AST_HEADER;
+  s128 value;
+} Int_Expr;
+
+typedef struct Float_Expr
+{
+  AST_HEADER;
+  f64 value;
+} Float_Expr;
+
+typedef struct Bool_Expr
+{
+  AST_HEADER;
+  bool value;
+} Bool_Expr;
+
+typedef struct Proc_Type_Expr
+{
+  AST_HEADER;
+  // TODO:
+} Proc_Type_Expr;
+
+typedef struct Proc_Lit_Expr
+{
+  AST_HEADER;
+  // TODO:
+} Proc_Lit_Expr;
+
+typedef struct Compound_Expr
+{
+  AST_HEADER;
+  AST* inner;
+} Compound_Expr;
+
+typedef struct Array_Type_Expr
+{
+  AST_HEADER;
+  AST* size;
+  AST* type;
+} Array_Type_Expr;
+
+typedef struct Subscript_Expr
+{
+  AST_HEADER;
+  AST* array;
+  AST* idx;
+} Subscript_Expr;
+
+typedef struct Slice_Expr
+{
+  AST_HEADER;
+  AST* array;
+  AST* first_idx;
+  AST* past_idx;
+} Slice_Expr;
+
+typedef struct Member_Expr
+{
+  AST_HEADER;
+  AST* host;
+  AST* name;
+} Member_Expr;
+
+typedef struct Call_Expr
+{
+  AST_HEADER;
+  // TODO:
+} Call_Expr;
+
+typedef struct Struct_Type_Expr
+{
+  AST_HEADER;
+  // TODO:
+} Struct_Type_Expr;
+
+typedef struct Array_Lit_Expr
+{
+  AST_HEADER;
+  // TODO:
+} Array_Lit_Expr;
+
+typedef struct Unary_Expr
+{
+  AST_HEADER;
+  AST* expr;
+} Unary_Expr;
+
+typedef struct Binary_Expr
+{
+  AST_HEADER;
+  AST* left;
+  AST* right;
+} Binary_Expr;
+
+typedef struct Conditional_Expr
+{
+  AST_HEADER;
+  AST* condition;
+  AST* true_expr;
+  AST* false_expr;
+} Conditional_Expr;
+
+typedef struct Assignment_Stmnt
+{
+  AST_HEADER;
+  AST* lhs;
+  AST* rhs;
+  AST_Kind op;
+} Assignment_Stmnt;
