@@ -36,8 +36,65 @@ typedef u8 bool;
 typedef float f32;
 typedef double f64;
 
+#define ARRAY_SIZE(A) (sizeof(A)/sizeof(0[A]))
+
 #define ASSERT_MSG(EX, MSG, ...) ((EX) ? 1 : (AssertHandler(__FILE__, __LINE__, #EX, (MSG),##__VA_ARGS__), __debugbreak(), 0))
 #define ASSERT(EX) ASSERT_MSG(EX, "")
 #define NOT_IMPLEMENTED ASSERT(!"NOT_IMPLEMENTED")
 
-void AssertHandler(const char* file, int line, const char* expr);
+void AssertHandler(const char* file, int line, const char* expr, const char* message, ...);
+
+typedef struct String
+{
+  u8* data;
+  umm len;
+} String;
+
+#define STRING(S) (String){ .data = (u8*)(S), .len = sizeof(S)-1 }
+#define COMPSTRING(S) { .data = (u8*)(S), .len = sizeof(S)-1 }
+
+bool
+String_Match(String a, String b)
+{
+  bool does_match = (a.len == b.len);
+
+  for (umm i = 0; i < a.len && does_match; ++i) does_match = (a.data[i] == b.data[i]);
+
+  return does_match;
+}
+
+bool
+Char_IsAlpha(u8 c)
+{
+  return ((u8)((c&0xDF)-'A') <= (u8)('Z'-'A'));
+}
+
+bool
+Char_IsDigit(u8 c)
+{
+  return ((u8)(c-'0') < (u8)10);
+}
+
+bool
+Char_IsHexAlphaDigit(u8 c)
+{
+  return ((u8)((c&0xDF)-'A') <= (u8)('F'-'A'));
+}
+
+bool
+Char_IsHexDigit(u8 c)
+{
+  return (Char_IsDigit(c) || Char_IsHexAlphaDigit(c));
+}
+
+typedef union F32_Bits
+{
+  f32 f;
+  u32 bits;
+} F32_Bits;
+
+typedef union F64_Bits
+{
+  f64 f;
+  u64 bits;
+} F64_Bits;
