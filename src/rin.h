@@ -53,7 +53,7 @@ typedef struct String
 #define STRING(S) (String){ .data = (u8*)(S), .len = sizeof(S)-1 }
 #define COMPSTRING(S) { .data = (u8*)(S), .len = sizeof(S)-1 }
 
-bool
+inline bool
 String_Match(String a, String b)
 {
   bool does_match = (a.len == b.len);
@@ -63,28 +63,40 @@ String_Match(String a, String b)
   return does_match;
 }
 
-bool
+inline bool
 Char_IsAlpha(u8 c)
 {
   return ((u8)((c&0xDF)-'A') <= (u8)('Z'-'A'));
 }
 
-bool
+inline bool
 Char_IsDigit(u8 c)
 {
   return ((u8)(c-'0') < (u8)10);
 }
 
-bool
+inline bool
 Char_IsHexAlphaDigit(u8 c)
 {
   return ((u8)((c&0xDF)-'A') <= (u8)('F'-'A'));
 }
 
-bool
+inline bool
 Char_IsHexDigit(u8 c)
 {
   return (Char_IsDigit(c) || Char_IsHexAlphaDigit(c));
+}
+
+inline u8
+Char_ToUpperUnconditional(u8 c)
+{
+  return c & 0xDF;
+}
+
+inline u8
+Char_ToLowerUnconditional(u8 c)
+{
+  return c | 0x20;
 }
 
 typedef union F32_Bits
@@ -98,3 +110,6 @@ typedef union F64_Bits
   f64 f;
   u64 bits;
 } F64_Bits;
+
+#include "memory.h"
+#include "lexer.h"

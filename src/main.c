@@ -1,10 +1,9 @@
 #include "rin.h"
-#include "lexer.h"
 
 #include <stdio.h>
 #include <stdarg.h>
 
-void
+static void
 AssertHandler(const char* file, int line, const char* expr, const char* message, ...)
 {
   fprintf(stderr, "%s(%d): Assertion \"%s\" failed\n", file, line, expr);

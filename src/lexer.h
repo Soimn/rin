@@ -158,23 +158,25 @@ typedef struct Token
 
 typedef struct Lexer
 {
+  Arena* string_arena;
   u8* input;
   u8* cur;
   Text_Pos start;
 } Lexer;
 
 // NOTE: input must be terminated with 4 zeros
-Lexer
-Lexer_Init(u8* input, Text_Pos start)
+static Lexer
+Lexer_Init(Arena* string_arena, u8* input, Text_Pos start)
 {
   return (Lexer){
-    .input = input,
-    .cur   = input,
-    .start = start,
+    .string_arena = string_arena,
+    .input        = input,
+    .cur          = input,
+    .start        = start,
   };
 }
 
-Token
+static Token
 Lexer_NextToken(Lexer* lexer)
 {
   Token token = { .kind = Token_Invalid };
@@ -251,39 +253,6 @@ Lexer_NextToken(Lexer* lexer)
     case '%': token.kind = Token_Rem   | c1_eq_bit; lexer->cur += c1_eq; break;
     case '~': token.kind = Token_Tilde | c1_eq_bit; lexer->cur += c1_eq; break;
 
-    case '.':
-    {
-      token.kind = Token_Dot;
-      if (*lexer->cur == '.') token.kind = Token_Elipsis;
-      if (*lexer->cur == '(') token.kind = Token_DotParen;
-      if (*lexer->cur == '[') token.kind = Token_DotBracket;
-      if (*lexer->cur == '{') token.kind = Token_DotBrace;
-
-      lexer->cur += (token.kind != Token_Dot);
-    } break;
-
-    case ':':
-    {
-      token.kind = Token_Colon;
-      if (*lexer->cur == ':')
-      {
-        token.kind = Token_ColonColon;
-        ++lexer->cur;
-      }
-    } break;
-
-    case '=':
-    {
-      token.kind = (c1_eq ? Token_CmpEq : Token_Equals);
-      lexer->cur += c1_eq;
-    } break;
-
-    case '!':
-    {
-      token.kind = (c1_eq ? Token_CmpNeq : Token_Bang);
-      lexer->cur += c1_eq;
-    } break;
-
     case '&':
     {
       if (*lexer->cur == '&')
@@ -324,6 +293,39 @@ Lexer_NextToken(Lexer* lexer)
         token.kind = Token_CmpLe + c1_eq;
         lexer->cur += c1_eq;
       }
+    } break;
+
+    case '.':
+    {
+      token.kind = Token_Dot;
+      if (*lexer->cur == '.') token.kind = Token_Elipsis;
+      if (*lexer->cur == '(') token.kind = Token_DotParen;
+      if (*lexer->cur == '[') token.kind = Token_DotBracket;
+      if (*lexer->cur == '{') token.kind = Token_DotBrace;
+
+      lexer->cur += (token.kind != Token_Dot);
+    } break;
+
+    case ':':
+    {
+      token.kind = Token_Colon;
+      if (*lexer->cur == ':')
+      {
+        token.kind = Token_ColonColon;
+        ++lexer->cur;
+      }
+    } break;
+
+    case '=':
+    {
+      token.kind = (c1_eq ? Token_CmpEq : Token_Equals);
+      lexer->cur += c1_eq;
+    } break;
+
+    case '!':
+    {
+      token.kind = (c1_eq ? Token_CmpNeq : Token_Bang);
+      lexer->cur += c1_eq;
     } break;
 
     case '>':
@@ -564,6 +566,7 @@ Lexer_NextToken(Lexer* lexer)
 
           if (*lexer->cur == '.')
           {
+            // TODO: Float parsing
             NOT_IMPLEMENTED;
           }
           else
@@ -588,17 +591,161 @@ Lexer_NextToken(Lexer* lexer)
       }
       else if (c == '"')
       {
-        String raw_string = { .data = lexer->cur };
+        u8 string_start = Arena_GetPointer(lexer->arena);
 
         while (*lexer->cur != 0 && *lexer->cur != '"')
         {
-          if (*lexer->cur == '\\' && *lexer->cur != 0) ++lexer->cur;
-          ++lexer->cur;
+          u8 chars[4]   = {0};
+          umm chars_len = 1;
+          
+          if (*lexer->cur != '\\')
+          {
+            chars[0] = *lexer->cur;
+
+            ++lexer->cur;
+          }
+          else
+          {
+            ++lexer->cur;
+
+            if (*lexer->cur == 0)
+            {
+              //// ERROR: Missing escape sequence after backslash
+              NOT_IMPLEMENTED;
+            }
+            else if (Char_ToUpperUnconditional(*lexer->cur) == 'U')
+            {
+              umm digit_count = (*lexer->cur == 'U' ? 6 : 4);
+              ++lexer->cur;
+
+              umm value = 0;
+              for (umm i = 0; i < 2; ++i)
+              {
+                u8 digit;
+                if      (Char_IsDigit(*lexer->cur))         digit = *lexer->cur&0xF;
+                else if (Char_IsHexAlphaDigit(*lexer->cur)) digit = 9 + (*lexer->cur&0x7);
+                else
+                {
+                  //// ERROR: Missing digits in unicode escape sequence
+                  NOT_IMPLEMENTED;
+                }
+
+                value <<= 4;
+                value  |= digit;
+
+                ++lexer->cur;
+              }
+
+              // TODO: translate to utf8
+              NOT_IMPLEMENTED;
+            }
+            else if (*lexer->cur == 'x')
+            {
+              ++lexer->cur;
+
+              for (umm i = 0; i < 2; ++i)
+              {
+                u8 digit;
+                if      (Char_IsDigit(*lexer->cur))         digit = *lexer->cur&0xF;
+                else if (Char_IsHexAlphaDigit(*lexer->cur)) digit = 9 + (*lexer->cur&0x7);
+                else
+                {
+                  //// ERROR: Missing digits in hex escape sequence
+                  NOT_IMPLEMENTED;
+                }
+
+                chars[0] <<= 4;
+                chars[0]  |= digit;
+
+                ++lexer->cur;
+              }
+            }
+            else if (Char_IsDigit(*lexer->cur))
+            {
+              if (!Char_IsDigit(lexer->cur[1]) || !Char_IsDigit(lexer->cur[2]))
+              {
+                //// ERROR: Missing digits in octal escape sequence
+                NOT_IMPLEMENTED;
+              }
+              else
+              {
+                umm value = 0;
+                for (umm i = 0; i < 3; ++i)
+                {
+                  u8 digit = *lexer->cur[i]&0xF;
+
+                  if (digit > 7)
+                  {
+                    //// ERROR: Invalid digit in octal escape sequence
+                    NOT_IMPLEMENTED;
+                  }
+                  else
+                  {
+                    value <<= 3;
+                    value  |= digit;
+                  }
+                }
+
+                if (value > 255)
+                {
+                  //// ERROR: Octal escape sequence is out of range
+                  NOT_IMPLEMENTED;
+                }
+                else
+                {
+                  lexer->cur += 3;
+
+                  chars[0] = (u8)value;
+                }
+              }
+            }
+            else
+            {
+              switch (*lexer->cur)
+              {
+                case 'a':  chars[0] = '\a'; break;
+                case 'b':  chars[0] = '\b'; break;
+                case 'f':  chars[0] = '\f'; break;
+                case 'n':  chars[0] = '\n'; break;
+                case 'r':  chars[0] = '\r'; break;
+                case 't':  chars[0] = '\t'; break;
+                case 'v':  chars[0] = '\v'; break;
+                case '\\': chars[0] = '\\'; break;
+                case '\'': chars[0] = '\''; break;
+                case '"':  chars[0] = '"';  break;
+
+                default:
+                {
+                  //// ERROR: Invalid escape sequence
+                  NOT_IMPLEMENTED;
+                } break;
+              }
+
+              ++lexer->cur;
+            }
+          }
+          
+          u8* dst = Arena_Push(lexer->string_arena, chars_len, 1);
+          for (umm i = 0; i < chars_len; ++i) dst[i] = chars[i];
         }
 
-        raw_string.len = lexer->cur - raw_string.data;
+        if (*lexer->cur != '"')
+        {
+          //// ERROR: Unterminated string literal
+          NOT_IMPLEMENTED;
+        }
+        else
+        {
+          ++lexer->cur;
 
-        NOT_IMPLEMENTED;
+          String string = {
+            .data = string_start,
+            .len  = Arena_GetPointer(lexer->arena) - string_start
+          };
+
+          token.kind   = Token_String;
+          token.string = string;
+        }
       }
       else
       {
