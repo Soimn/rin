@@ -418,173 +418,92 @@ Lexer_NextToken(Lexer* lexer)
       }
       else if (Char_IsDigit(c))
       {
-        bool is_float = false;
-        umm base      = 10;
+        bool is_hex_float = false;
+        umm base          = 10;
 
         if (c == 0)
         {
           if      (*lexer->cur == 'x') base = 16;
-          else if (*lexer->cur == 'h') base = 16, is_float = true;
+          else if (*lexer->cur == 'h') base = 16, is_hex_float = true;
           else if (*lexer->cur == 'b') base = 2;
+
+          if (base != 10) ++lexer->cur;
         }
 
-        if (base == 16)
+        umm value       = c&0xF;
+        umm digit_count = (base == 10);
+
+        for (;;)
         {
-          lexer->cur += 1;
-          
-          umm digit_count = 0;
-          u64 value = 0;
+          while (*lexer->cur == '_') ++lexer->cur;
 
-          for (;;)
+          u8 digit;
+          if      (Char_IsDigit(*lexer->cur))         digit = *lexer->cur&0xF;
+          else if (Char_IsHexAlphaDigit(*lexer->cur)) digit = 9 + (*lexer->cur&0x7);
+          else break;
+
+          if (digit >= base)
           {
-            while (*lexer->cur == '_') ++lexer->cur;
-
-            u8 digit;
-
-            if      (Char_IsDigit(*lexer->cur))         digit = *lexer->cur&0xF;
-            else if (Char_IsHexAlphaDigit(*lexer->cur)) digit = (*lexer->cur&0x7) + 9;
-            else                                        break;
-
-            value <<= 4;
-            value  |= digit;
-
-            ++digit_count;
-            ++lexer->cur;
+            //// ERROR: Invalid digit in literal
+            NOT_IMPLEMENTED;
           }
-
-          if (is_float)
+          else
           {
-            if (digit_count == 16)
+            umm old_val = value;
+
+            value *= base;
+
+            if (value < old_val || value + digit < old_val)
             {
-              token.kind     = Token_Float;
-              token.floating = (F64_Bits){ .bits = value }.f;
+              //// ERROR: Literal too large
+              NOT_IMPLEMENTED;
             }
-            else if (digit_count == 8)
+            else
+            {
+              value += digit;
+              
+              ++digit_count;
+              ++lexer->cur;
+            }
+          }
+        }
+
+        if (digit_count == 0)
+        {
+          //// ERROR: Missing digits
+          NOT_IMPLEMENTED;
+        }
+        else
+        {
+          if (is_hex_float)
+          {
+            if (digit_count == 8)
             {
               token.kind     = Token_Float;
               token.floating = (F32_Bits){ .bits = (u32)value }.f;
             }
+            else if (digit_count == 16)
+            {
+              token.kind     = Token_Float;
+              token.floating = (F64_Bits){ .bits = value }.f;
+            }
             else
             {
-              //// ERROR: Illegal length of hex float literal. Must be 8 or 16
+              //// ERROR: Invalid digit count in hex float
               NOT_IMPLEMENTED;
             }
           }
           else
           {
-            if (digit_count == 0)
-            {
-              //// ERROR: Missing digits in hex literal
-              NOT_IMPLEMENTED;
-            }
-            else if (digit_count > 16)
-            {
-              //// ERROR: Hex literal is too large
-              NOT_IMPLEMENTED;
-            }
-            else
+            if (*lexer->cur != '.')
             {
               token.kind    = Token_Int;
               token.integer = value;
             }
-          }
-        }
-        else if (base == 2)
-        {
-          lexer->cur += 1;
-
-          umm digit_count = 0;
-          u64 value = 0;
-
-          for (;;)
-          {
-            while (*lexer->cur == '_') ++lexer->cur;
-
-            if (*lexer->cur == '0' || *lexer->cur == '1')
-            {
-              value <<= 1;
-              value  |= (*lexer->cur == '1');
-
-              ++digit_count;
-              ++lexer->cur;
-            }
-            else if (Char_IsHexDigit(*lexer->cur))
-            {
-              //// ERROR: Invalid digit in binary literal
-              NOT_IMPLEMENTED;
-            }
-            else break;
-          }
-
-          if (digit_count == 0)
-          {
-            //// ERROR: Missing digits
-            NOT_IMPLEMENTED;
-          }
-          else if (digit_count > 64)
-          {
-            //// ERROR: Binary literal is too large
-            NOT_IMPLEMENTED;
-          }
-          else
-          {
-            token.kind    = Token_Int;
-            token.integer = value;
-          }
-        }
-        else
-        {
-          umm digit_count = 1;
-          s64 value = c&0xF;
-
-          bool has_overflown = false;
-
-          for (;;)
-          {
-            while (*lexer->cur == '_') ++lexer->cur;
-
-            if (Char_IsDigit(*lexer->cur))
-            {
-              s64 old_val = value;
-
-              value *= 10;
-              value += *lexer->cur&0xF;
-
-              // TODO: verify this
-              has_overflown = (has_overflown || value/10 != old_val);
-
-              ++digit_count;
-              ++lexer->cur;
-            }
-            else if (Char_IsHexAlphaDigit(*lexer->cur))
-            {
-              //// ERROR: Invalid digit in decimal literal
-              NOT_IMPLEMENTED;
-            }
-            else break;
-          }
-
-          if (*lexer->cur == '.')
-          {
-            // TODO: Float parsing
-            NOT_IMPLEMENTED;
-          }
-          else
-          {
-            if (digit_count == 0)
-            {
-              //// ERROR: Missing digits in decimal literal
-              NOT_IMPLEMENTED;
-            }
-            else if (has_overflown)
-            {
-              //// ERROR: Decimal literal is too large
-              NOT_IMPLEMENTED;
-            }
             else
             {
-              token.kind    = Token_Int;
-              token.integer = value;
+              // TODO: float parsing
+              NOT_IMPLEMENTED;
             }
           }
         }
@@ -613,89 +532,90 @@ Lexer_NextToken(Lexer* lexer)
               //// ERROR: Missing escape sequence after backslash
               NOT_IMPLEMENTED;
             }
-            else if (Char_ToUpperUnconditional(*lexer->cur) == 'U')
+            else if (Char_IsDigit(*lexer->cur))
             {
-              umm digit_count = (*lexer->cur == 'U' ? 6 : 4);
+              umm value = 0;
+              for (umm i = 0; i < 3; ++i)
+              {
+                if ((u8)(*lexer->cur-'0') < (u8)8)
+                {
+                  value <<= 3;
+                  value  |= *lexer->cur&0xF;
+
+                  ++lexer->cur;
+                }
+                else
+                {
+                  //// ERROR: Missing digits
+                  NOT_IMPLEMENTED;
+                }
+              }
+
+              chars[0] = (u8)value;
+
+              if (value > 255)
+              {
+                //// ERROR: Out of range
+                NOT_IMPLEMENTED;
+              }
+            }
+            else if (Char_ToUpperUnconditional(*lexer->cur) == 'U' || *lexer->cur == 'x')
+            {
+              umm digit_count = 6;
+              if (*lexer->cur == 'u') digit_count = 4;
+              if (*lexer->cur == 'x') digit_count = 2;
               ++lexer->cur;
 
               umm value = 0;
-              for (umm i = 0; i < 2; ++i)
+
+              for (umm i = 0; i < digit_count; ++i)
               {
                 u8 digit;
                 if      (Char_IsDigit(*lexer->cur))         digit = *lexer->cur&0xF;
                 else if (Char_IsHexAlphaDigit(*lexer->cur)) digit = 9 + (*lexer->cur&0x7);
                 else
                 {
-                  //// ERROR: Missing digits in unicode escape sequence
+                  //// ERROR: Missing digits in escape sequence
                   NOT_IMPLEMENTED;
                 }
-
-                value <<= 4;
-                value  |= digit;
-
-                ++lexer->cur;
-              }
-
-              // TODO: translate to utf8
-              NOT_IMPLEMENTED;
-            }
-            else if (*lexer->cur == 'x')
-            {
-              ++lexer->cur;
-
-              for (umm i = 0; i < 2; ++i)
-              {
-                u8 digit;
-                if      (Char_IsDigit(*lexer->cur))         digit = *lexer->cur&0xF;
-                else if (Char_IsHexAlphaDigit(*lexer->cur)) digit = 9 + (*lexer->cur&0x7);
                 else
                 {
-                  //// ERROR: Missing digits in hex escape sequence
-                  NOT_IMPLEMENTED;
+                  value <<= 4;
+                  value  |= digit;
+
+                  ++lexer->cur;
                 }
-
-                chars[0] <<= 4;
-                chars[0]  |= digit;
-
-                ++lexer->cur;
               }
-            }
-            else if (Char_IsDigit(*lexer->cur))
-            {
-              if (!Char_IsDigit(lexer->cur[1]) || !Char_IsDigit(lexer->cur[2]))
-              {
-                //// ERROR: Missing digits in octal escape sequence
-                NOT_IMPLEMENTED;
-              }
+
+              if (digit_count == 2) chars[0] = (u8)value; // NOTE: no translation for \x
               else
               {
-                umm value = 0;
-                for (umm i = 0; i < 3; ++i)
+                if (value <= 0x7F)
                 {
-                  u8 digit = *lexer->cur[i]&0xF;
-
-                  if (digit > 7)
-                  {
-                    //// ERROR: Invalid digit in octal escape sequence
-                    NOT_IMPLEMENTED;
-                  }
-                  else
-                  {
-                    value <<= 3;
-                    value  |= digit;
-                  }
+                  chars[0] = (u8)value;
                 }
-
-                if (value > 255)
+                else if (value <= 0x7FF)
                 {
-                  //// ERROR: Octal escape sequence is out of range
-                  NOT_IMPLEMENTED;
+                  chars[0] = 0xC0 | (u8)(value >> 6);
+                  chars[1] = 0x80 | (u8)value;
+                }
+                else if (value <= 0xFFFF)
+                {
+                  chars[0] = 0xE0 | (u8)(value >> 12);
+                  chars[1] = 0x80 | (u8)(value >>  6);
+                  chars[2] = 0x80 | (u8)value;
+                }
+                else if (value <= 0x10FFFF)
+                {
+                  chars[0] = 0xF0 | (u8)(value >> 18);
+                  chars[1] = 0x80 | (u8)(value >> 12);
+                  chars[2] = 0x80 | (u8)(value >> 6);
+                  chars[3] = 0x80 | (u8)value;
                 }
                 else
                 {
-                  lexer->cur += 3;
-
-                  chars[0] = (u8)value;
+                  //// ERROR: Unicode codepoint out of range for utf8
+                  NOT_IMPLEMENTED;
                 }
               }
             }

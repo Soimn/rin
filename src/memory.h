@@ -42,6 +42,7 @@ Arena_Push(Arena* arena, umm size, u8 alignment)
   if (arena->offset > arena->committed)
   {
     NOT_IMPLEMENTED;
+    CommitMemory(arena->memory + arena->committed, ((arena->offset - arena->committed) + (ARENA_PAGE_SIZE-1)) & ~(ARENA_PAGE_SIZE-1));
   }
 
   return result;
