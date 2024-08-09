@@ -1,18 +1,16 @@
+#define NOMINMAX            1
+#define WIN32_LEAN_AND_MEAN 1
+#define WIN32_MEAN_AND_LEAN 1
+#define VC_EXTRALEAN        1
+#include <windows.h>
+#undef NOMINMAX
+#undef WIN32_LEAN_AND_MEAN
+#undef WIN32_MEAN_AND_LEAN
+#undef VC_EXTRALEAN
+#undef far
+#undef near
+
 #include "rin.h"
-
-#include <stdio.h>
-#include <stdarg.h>
-
-static void
-AssertHandler(const char* file, int line, const char* expr, const char* message, ...)
-{
-  fprintf(stderr, "%s(%d): Assertion \"%s\" failed\n", file, line, expr);
-
-  va_list args;
-  va_start(args, message);
-  vfprintf(stderr, message, args);
-  va_end(args);
-}
 
 int
 main(int argc, char** argv)
