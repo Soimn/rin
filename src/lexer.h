@@ -2,18 +2,18 @@ typedef struct Lexer
 {
   u8* input;
   u8* cursor;
-  u32 file_offset;
-  u16 file_idx;
+  u8* start_of_line;
+  u32 line;
 } Lexer;
 
 static Lexer
-Lexer_Init(u8* file_content, u16 file_idx, u32 file_offset)
+Lexer_Init(u8* file_content)
 {
   return (Lexer){
-    .input       = file_content,
-    .cursor      = file_content,
-    .file_offset = file_offset,
-    .file_idx    = file_idx,
+    .input         = file_content,
+    .cursor        = file_content,
+    .start_of_line = file_content,
+    .line          = 1,
   };
 }
 
@@ -27,7 +27,16 @@ Lexer_NextToken(Lexer* lexer)
   for (;;)
   {
     // NOTE: All characters in the range [0x1, 0x20] are considered whitespace
-    while ((u8)(*lexer->cursor-1) < (u8)0x20) ++lexer->cursor;
+    while ((u8)(*lexer->cursor-1) < (u8)0x20)
+    {
+      ++lexer->cursor;
+
+      if (*lexer->cursor == '\n')
+      {
+        lexer->line         += 1;
+        lexer->start_of_line = lexer->cursor;
+      }
+    }
 
     if (lexer->cursor[0] == '/' && lexer->cursor[1] == '/')
     {
@@ -51,7 +60,17 @@ Lexer_NextToken(Lexer* lexer)
           lexer->cursor += 2;
           nesting       -= 1;
         }
-        else lexer->cursor += 1;
+        else
+        {
+          ++lexer->cursor;
+
+          if (*lexer->cursor == '\n')
+          {
+            lexer->line         += 1;
+            lexer->start_of_line = lexer->cursor;
+          }
+
+        }
       }
     }
     else break;
@@ -66,7 +85,7 @@ Lexer_NextToken(Lexer* lexer)
     lexer->cursor += 1;
 
     u8 c1_eq      = (*lexer->cursor == '=');
-    u32 c1_eq_bit = (*lexer->cursor == '=' ? TOKEN_KIND__BLOCK(16) : 0);
+    u32 c1_eq_bit = (*lexer->cursor == '=' ? TOKEN_KIND__ASS_BIT : 0);
 
     switch (c)
     {
@@ -397,9 +416,10 @@ Lexer_NextToken(Lexer* lexer)
     }
   }
 
-  token.file_idx = lexer->file_idx;
-  token.offset   = lexer->file_offset + (u32)(start_of_token - lexer->input);
+  token.offset   = (u32)(start_of_token - lexer->input);
   token.len      = (u32)(lexer->cursor - start_of_token);
+  token.line     = lexer->line; // TODO: This is only valid as long as there are no multiline tokens
+  token.col      = (u32)(start_of_token - lexer->start_of_line) + 1;
 
   // TODO: temp
   if (encountered_errors) token.kind = Token_Invalid;
