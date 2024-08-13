@@ -2,6 +2,8 @@
 #define AST_KIND__BLOCK(N) ((N) << AST_KIND__BLOCK_SIZE_LG2)
 #define AST_KIND__BLOCK_IDX(N) ((N) >> AST_KIND__BLOCK_SIZE_LG2)
 #define AST_KIND__BLOCK_OFFSET(N) ((N) & ~(AST_KIND__BLOCK_SIZE_LG2-1))
+#define AST_KIND__FirstBinaryBlockIDX 3
+#define AST_KIND__PastLastBinaryBlockIDX 8
 
 typedef enum AST_Kind
 {
@@ -132,7 +134,7 @@ typedef enum AST_Kind
 typedef struct AST_Header
 {
   AST_Kind kind;
-  struct AST* next; // TODO: see if this is actually usefull
+  struct AST_Header* next; // TODO: see if this is actually usefull
 } AST_Header;
 
 #define AST_HEADER union { struct AST_Header; AST_Header header; }
@@ -175,7 +177,7 @@ typedef struct AST_Bool_Expr
 typedef struct AST_Compound_Expr
 {
   AST_HEADER;
-  AST* expr;
+  AST* inner;
 } AST_Compound_Expr;
 
 typedef struct AST_Proc_Type_Expr
@@ -217,7 +219,7 @@ typedef struct AST_Slice_Expr
   AST_HEADER;
   AST* array;
   AST* start_idx;
-  AST* past_end_idx;
+  AST* past_last_idx;
 } AST_Slice_Expr;
 
 // NOTE: Call or Cast
@@ -231,8 +233,8 @@ typedef struct AST_Call_Expr
 typedef struct AST_Member_Expr
 {
   AST_HEADER;
-  AST* collection;
-  AST* member;
+  AST* operand;
+  // TODO:
 } AST_Member_Expr;
 
 typedef struct AST_Struct_Lit_Expr

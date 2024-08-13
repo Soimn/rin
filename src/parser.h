@@ -47,14 +47,111 @@ static bool Parser__ParseExpression(Parser* state, AST** expr);
 static bool
 Parser__ParseArgs(Parser* state, AST** args)
 {
-  NOT_IMPLEMENTED;
+  for (;;)
+  {
+    AST* name = 0;
+    AST* value;
+
+    if (!Parser__ParseExpression(state, &value)) return false;
+
+    if (EAT_TOKEN(Token_EQ))
+    {
+      name = value;
+      if (!Parser__ParseExpression(state, &value)) return false;
+    }
+
+    AST_Argument* argument = PUSH_EXPR(AST_Argument, AST_Arg);
+    argument->name  = name;
+    argument->value = value;
+
+    *args = &argument->header;
+    args = &argument->next;
+
+    if (EAT_TOKEN(Token_Colon)) continue;
+    else                        break;
+  }
+
   return true;
 }
 
 static bool
 Parser__ParsePrimaryExpression(Parser* state, AST** expr)
 {
-  NOT_IMPLEMENTED;
+  Token token = GET_TOKEN();
+
+  if (token.kind == Token_Ident)
+  {
+    NOT_IMPLEMENTED;
+  }
+  else if (token.kind == Token_String)
+  {
+    NOT_IMPLEMENTED;
+  }
+  else if (token.kind == Token_Int)
+  {
+    AST_Int_Expr* int_expr = PUSH_EXPR(AST_Int_Expr, AST_Int);
+    int_expr->value = token.integer;
+
+    NEXT_TOKEN();
+
+    *expr = &int_expr->header;
+  }
+  else if (token.kind == Token_Float)
+  {
+    AST_Float_Expr* float_expr = PUSH_EXPR(AST_Float_Expr, AST_Float);
+    float_expr->value = token.floating;
+
+    NEXT_TOKEN();
+
+    *expr = &float_expr->header;
+  }
+  else if (token.kind == Token_True || token.kind == Token_False)
+  {
+    AST_Bool_Expr* bool_expr = PUSH_EXPR(AST_Bool_Expr, AST_Bool);
+    bool_expr->value = (token.kind == Token_True);
+
+    NEXT_TOKEN();
+
+    *expr = &bool_expr->header;
+  }
+  else if (token.kind == Token_OpenParen)
+  {
+    AST* inner;
+    if (!Parser__ParseExpression(state, &inner)) return false;
+
+    AST_Compound_Expr* compound = PUSH_EXPR(AST_Compound_Expr, AST_Compound);
+    compound->inner = inner;
+
+    *expr = &compound->header;
+
+    if (!EAT_TOKEN(Token_CloseParen))
+    {
+      //// ERROR: Missing close paren
+      return false;
+    }
+  }
+  else if (EAT_TOKEN(Token_Proc))
+  {
+    NOT_IMPLEMENTED;
+  }
+  else if (EAT_TOKEN(Token_Struct))
+  {
+    NOT_IMPLEMENTED;
+  }
+  else
+  {
+    if (token.kind == Token_Invalid)
+    {
+      //// ERROR
+      return false;
+    }
+    else
+    {
+      //// ERROR: Missing primary expression
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -96,15 +193,80 @@ Parser__ParsePostfixExpression(Parser* state, AST** expr)
     }
     else if (EAT_TOKEN(Token_OpenBracket))
     {
-      NOT_IMPLEMENTED;
+      AST* first = 0;
+      if (GET_TOKEN().kind != Token_Colon)
+      {
+        if (!Parser__ParseExpression(state, &first)) return false;
+      }
+
+      if (EAT_TOKEN(Token_Colon))
+      {
+        AST* second = 0;
+        if (GET_TOKEN().kind != Token_CloseBracket)
+        {
+          if (!Parser__ParseExpression(state, &second)) return false;
+        }
+
+        AST_Slice_Expr* slice = PUSH_EXPR(AST_Slice_Expr, AST_Slice);
+        slice->array         = *expr;
+        slice->start_idx     = first;
+        slice->past_last_idx = second;
+
+        *expr = &slice->header;
+      }
+      else
+      {
+        AST_Index_Expr* index = PUSH_EXPR(AST_Index_Expr, AST_Index);
+        index->array = *expr;
+        index->idx   = first;
+
+        *expr = &index->header;
+      }
+
+      if (!EAT_TOKEN(Token_CloseBracket))
+      {
+        //// ERROR: Missing closing bracket
+        return false;
+      }
     }
     else if (EAT_TOKEN(Token_Dot))
     {
+      if (GET_TOKEN().kind != Token_Ident)
+      {
+        //// ERROR: Missing member name to access
+        return false;
+      }
+
+      // TODO:
       NOT_IMPLEMENTED;
+      NEXT_TOKEN();
+
+      AST_Member_Expr* member = PUSH_EXPR(AST_Member_Expr, AST_Member);
+      member->operand = *expr;
+      // member->member = ;
+      NOT_IMPLEMENTED;
+
+      *expr = &member->header;
     }
     else if (EAT_TOKEN(Token_DotBrace))
     {
-      NOT_IMPLEMENTED;
+      AST* args = 0;
+      if (GET_TOKEN().kind != Token_CloseBrace)
+      {
+        if (!Parser__ParseArgs(state, &args)) return false;
+      }
+
+      if (!EAT_TOKEN(Token_CloseBrace))
+      {
+        //// ERROR: Missing closing brace
+        return false;
+      }
+
+      AST_Struct_Lit_Expr* struct_lit = PUSH_EXPR(AST_Struct_Lit_Expr, AST_StructLit);
+      struct_lit->operand = *expr;
+      struct_lit->args    = args;
+
+      *expr = &struct_lit->header;
     }
     else break;
   }
@@ -173,7 +335,57 @@ Parser__ParsePrefixExpression(Parser* state, AST** expr)
 static bool
 Parser__ParseBinaryExpression(Parser* state, AST** expr)
 {
-  NOT_IMPLEMENTED;
+  if (!Parser__ParsePrefixExpression(state, expr)) return false;
+
+  if (TOKEN_KIND__IS_BINARY(GET_TOKEN().kind))
+  {
+    struct { AST** slot; u32 precedence; } stack[2 + (AST_KIND__PastLastBinaryBlockIDX - AST_KIND__FirstBinaryBlockIDX)];
+    stack[0].slot       = 0;
+    stack[0].precedence = U32_MAX;
+    stack[1].slot       = expr;
+    stack[1].precedence = 0;
+
+    u32 stack_idx = 1;
+
+    for (;;)
+    {
+      AST_Kind op_kind = (AST_Kind)GET_TOKEN().kind;
+      u32 op_block_idx = AST_KIND__BLOCK_IDX(op_kind);
+      NEXT_TOKEN();
+
+      AST* left = *stack[stack_idx].slot;
+      AST* right;
+      if (!Parser__ParsePrefixExpression(state, &right)) return false;
+
+      AST_Binary_Expr* op = PUSH_EXPR(AST_Binary_Expr, op_kind);
+      op->left  = left;
+      op->right = right;
+
+      *stack[stack_idx].slot      = &op->header;
+      stack[stack_idx].precedence = op_block_idx;
+
+      Token_Kind peek_kind = GET_TOKEN().kind;
+      if (!TOKEN_KIND__IS_BINARY(peek_kind)) break;
+      else
+      {
+        u32 peek_block_idx = AST_KIND__BLOCK_IDX(peek_block_idx);
+
+        if (peek_block_idx < op_block_idx)
+        {
+          ASSERT(stack_idx < ARRAY_SIZE(stack) - 1);
+
+          stack_idx += 1;
+          stack[stack_idx].slot = &op->right;
+        }
+        else if (peek_block_idx > op_block_idx)
+        {
+          while (stack[stack_idx-1].precedence <= peek_block_idx) stack_idx -= 1;
+          ASSERT(stack_idx > 0);
+        }
+      }
+    }
+  }
+
   return true;
 }
 
@@ -214,6 +426,13 @@ static bool
 Parser_ParseExpression(Parser* state, AST** expr)
 {
   return Parser__ParseExpression(state, expr);
+}
+
+static bool
+Parser_ParseStatement(Parser* state, AST** stmnt)
+{
+  NOT_IMPLEMENTED;
+  return true;
 }
 
 #undef GET_TOKEN

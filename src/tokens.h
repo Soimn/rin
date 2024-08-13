@@ -4,6 +4,8 @@
 #define TOKEN_KIND__BLOCK_OFFSET(N) ((N) & ~(TOKEN_KIND__BLOCK_SIZE_LG2-1))
 #define TOKEN_KIND__ASS_BIT TOKEN_KIND__BLOCK(8)
 
+#define TOKEN_KIND__IS_BINARY(K) ((u32)((K) - Token__FirstBinary) <= (u32)(Token__PastLastBinary - Token__FirstBinary))
+
 typedef enum Token_Kind
 {
   Token_Invalid = 0,
