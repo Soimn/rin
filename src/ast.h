@@ -123,11 +123,15 @@ typedef enum AST_Kind
   AST__FirstLOrLevelAssignment = AST_KIND__BLOCK(8 + 7),
   AST_LOrEQ = AST__FirstLOrLevelAssignment,
   AST__PastLastLOrLevelAssignment,
-  AST__PastLastBinaryAssignment = AST__PastLastLOrLevelAssignment,
-  AST__PastLastStmnt = AST__PastLastBinaryAssignment,
+
+  AST_EQ,
+  AST__PastLastAssignment,
+  AST__PastLastStmnt = AST__PastLastAssignment,
 
   AST__FirstSpecial,
   AST_Arg = AST__FirstSpecial,
+  AST_Param,
+  AST_RetType,
   AST__PastLastSpecial,
 } AST_Kind;
 
@@ -183,13 +187,16 @@ typedef struct AST_Compound_Expr
 typedef struct AST_Proc_Type_Expr
 {
   AST_HEADER;
-  // TODO:
+  AST* params;
+  AST* ret_types;
 } AST_Proc_Type_Expr;
 
 typedef struct AST_Proc_Lit_Expr
 {
   AST_HEADER;
-  // TODO:
+  AST* params;
+  AST* ret_types;
+  AST* body;
 } AST_Proc_Lit_Expr;
 
 typedef struct AST_Struct_Type_Expr
@@ -234,7 +241,7 @@ typedef struct AST_Member_Expr
 {
   AST_HEADER;
   AST* operand;
-  Ident name;
+  AST* name;
 } AST_Member_Expr;
 
 typedef struct AST_Struct_Lit_Expr
@@ -362,3 +369,19 @@ typedef struct AST_Argument
   AST* value;
   AST* name;
 } AST_Argument;
+
+typedef struct AST_Parameter
+{
+  AST_HEADER;
+  AST* names;
+  AST* type;
+  AST* value;
+} AST_Parameter;
+
+typedef struct AST_Return_Type
+{
+  AST_HEADER;
+  AST* names;
+  AST* type;
+  AST* value;
+} AST_Return_Type;

@@ -49,7 +49,21 @@ Parser__PushExpr(Parser* state, umm size, u8 alignment, AST_Kind kind)
 
 #define PUSH_EXPR(T, K) Parser__PushExpr(state, sizeof(T), _alignof(T), (K))
 
+static void*
+Parser__PushStmnt(Parser* state, umm size, u8 alignment, AST_Kind kind)
+{
+  AST* result = Arena_Push(state->ast_arena, size, alignment);
+
+  result->kind = kind;
+  result->next = 0;
+
+  return result;
+}
+
+#define PUSH_STMNT(T, K) Parser__PushStmnt(state, sizeof(T), _alignof(T), (K))
+
 static bool Parser__ParseExpression(Parser* state, AST** expr);
+static bool Parser__ParsePrimaryExpression(Parser* state, AST** expr);
 static bool Parser__ParseBlock(Parser* state, AST** block);
 
 static bool
@@ -76,6 +90,20 @@ Parser__ParseArgs(Parser* state, AST** args)
     args = &argument->next;
 
     if (EAT_TOKEN(Token_Colon)) continue;
+    else                        break;
+  }
+
+  return true;
+}
+
+static bool
+Parser__ParseCommaSeparatedExpressions(Parser* state, AST** expr)
+{
+  for (AST** next_expr = expr;; next_expr = &(*next_expr)->next)
+  {
+    if (!Parser__ParseExpression(state, next_expr)) return false;
+
+    if (EAT_TOKEN(Token_Comma)) continue;
     else                        break;
   }
 
@@ -145,7 +173,132 @@ Parser__ParsePrimaryExpression(Parser* state, AST** expr)
   }
   else if (EAT_TOKEN(Token_Proc))
   {
-    NOT_IMPLEMENTED;
+    AST* params   = 0;
+    AST* ret_types = 0;
+
+    if (!EAT_TOKEN(Token_OpenParen))
+    {
+      //// ERROR: Missing parameter list
+      return false;
+    }
+
+    if (GET_TOKEN().kind != Token_CloseParen)
+    {
+      for (AST** next_param = &params;; next_param = &(*next_param)->next)
+      {
+        AST* names;
+        AST* type  = 0;
+        AST* value = 0;
+
+        if (!Parser__ParseCommaSeparatedExpressions(state, &names)) return false;
+
+        if (!EAT_TOKEN(Token_Colon))
+        {
+          //// ERROR: Missing type of parameters
+          return false;
+        }
+
+        if (GET_TOKEN().kind != Token_EQ)
+        {
+          if (!Parser__ParseExpression(state, &type)) return false;
+        }
+
+        if (EAT_TOKEN(Token_EQ))
+        {
+          if (!Parser__ParseExpression(state, &value)) return false;
+        }
+
+        AST_Parameter* param = PUSH_EXPR(AST_Parameter, AST_Param);
+        param->names = names;
+        param->type  = type;
+        param->value = value;
+
+        *next_param = &param->header;
+
+        if (EAT_TOKEN(Token_Comma)) continue;
+        else                        break;
+      }
+    }
+
+    if (!EAT_TOKEN(Token_CloseParen))
+    {
+      //// ERROR: Missing closing paren
+      return false;
+    }
+
+    if (EAT_TOKEN(Token_Arrow))
+    {
+      if (GET_TOKEN().kind != Token_OpenParen)
+      {
+        if (!Parser__ParseExpression(state, &ret_types)) return false;
+      }
+      else
+      {
+        NEXT_TOKEN(); // NOTE: Skip open paren
+
+        for (AST** next_type = &ret_types;; next_type = &(*next_type)->next)
+        {
+          AST* names;
+          AST* type  = 0;
+          AST* value = 0;
+
+          if (!Parser__ParseCommaSeparatedExpressions(state, &names)) return false;
+
+          if (!EAT_TOKEN(Token_Colon))
+          {
+            //// ERROR: Missing type of parameters
+            return false;
+          }
+
+          if (GET_TOKEN().kind != Token_EQ)
+          {
+            if (!Parser__ParseExpression(state, &type)) return false;
+          }
+
+          if (EAT_TOKEN(Token_EQ))
+          {
+            if (!Parser__ParseExpression(state, &value)) return false;
+          }
+
+          AST_Return_Type* ret_type = PUSH_EXPR(AST_Return_Type, AST_RetType);
+          ret_type->names = names;
+          ret_type->type  = type;
+          ret_type->value = value;
+
+          *next_type = &ret_type->header;
+
+          if (EAT_TOKEN(Token_Comma)) continue;
+          else                        break;
+        }
+
+        if (!EAT_TOKEN(Token_CloseParen))
+        {
+          //// ERROR: Missing close paren
+          return false;
+        }
+      }
+    }
+
+    if (GET_TOKEN().kind == Token_OpenBrace)
+    {
+      AST* body;
+      if (!Parser__ParseBlock(state, &body)) return false;
+
+      AST_Proc_Lit_Expr* proc_lit = PUSH_EXPR(AST_Proc_Lit_Expr, AST_ProcLit);
+      proc_lit->params    = params;
+      proc_lit->ret_types = ret_types;
+      proc_lit->body      = body;
+
+      *expr = &proc_lit->header;
+    }
+    else
+    {
+      AST_Proc_Type_Expr* proc_type = PUSH_EXPR(AST_Proc_Type_Expr, AST_ProcType);
+      proc_type->params    = params;
+      proc_type->ret_types = ret_types;
+
+      *expr = &proc_type->header;
+    }
   }
   else if (EAT_TOKEN(Token_Struct))
   {
@@ -256,14 +409,8 @@ Parser__ParsePostfixExpression(Parser* state, AST** expr)
     }
     else if (EAT_TOKEN(Token_Dot))
     {
-      if (GET_TOKEN().kind != Token_Ident)
-      {
-        //// ERROR: Missing member name to access
-        return false;
-      }
-
-      Ident name = GET_TOKEN().ident;
-      NEXT_TOKEN();
+      AST* name;
+      if (!Parser__ParsePrimaryExpression(state, &name)) return false;
 
       AST_Member_Expr* member = PUSH_EXPR(AST_Member_Expr, AST_Member);
       member->operand = *expr;
@@ -444,22 +591,209 @@ Parser__ParseExpression(Parser* state, AST** expr)
   return true;
 }
 
-// TODO: Stub that can be used to flatten expressions later
 static bool
-Parser_ParseExpression(Parser* state, AST** expr)
+Parser__ParseStatement(Parser* state, AST** stmnt)
 {
-  return Parser__ParseExpression(state, expr);
-}
+  if (EAT_TOKEN(Token_Colon))
+  {
+    AST* label;
+    if (!Parser__ParseExpression(state, &label)) return false;
 
-static bool
-Parser_ParseStatement(Parser* state, AST** stmnt)
-{
-  NOT_IMPLEMENTED;
+    Token token = GET_TOKEN();
+    if (token.kind != Token_OpenBrace && token.kind != Token_If && token.kind != Token_While)
+    {
+      //// ERROR: Labels may only be applied to block, if and while statements
+      return false;
+    }
+
+    if (!Parser__ParseStatement(state, stmnt)) return false;
+
+    if      ((*stmnt)->kind == AST_Block) ((AST_Block_Stmnt*)*stmnt)->label = label;
+    else if ((*stmnt)->kind == AST_If)    ((AST_If_Stmnt*)*stmnt)->label    = label;
+    else if ((*stmnt)->kind == AST_While) ((AST_While_Stmnt*)*stmnt)->label = label;
+    else UNREACHABLE;
+  }
+  else if (GET_TOKEN().kind == Token_OpenBrace)
+  {
+    if (!Parser__ParseBlock(state, stmnt)) return false;
+  }
+  else if (EAT_TOKEN(Token_If))
+  {
+    if (!EAT_TOKEN(Token_OpenParen))
+    {
+      //// ERROR: Missing condition of if statement
+      return false;
+    }
+
+    AST* condition;
+    if (!Parser__ParseExpression(state, &condition)) return false;
+
+    if (!EAT_TOKEN(Token_CloseParen))
+    {
+      //// ERROR: Missing closing paren
+      return false;
+    }
+
+    AST* true_body;
+    if (!Parser__ParseStatement(state, &true_body)) return false;
+
+    AST* false_body = 0;
+    if (EAT_TOKEN(Token_Else))
+    {
+      if (!Parser__ParseStatement(state, &false_body)) return false;
+    }
+
+    AST_If_Stmnt* if_stmnt = PUSH_STMNT(AST_If_Stmnt, AST_If);
+    if_stmnt->label      = 0;
+    if_stmnt->condition  = condition;
+    if_stmnt->true_body  = true_body;
+    if_stmnt->false_body = false_body;
+
+    *stmnt = &if_stmnt->header;
+  }
+  else if (GET_TOKEN().kind == Token_Else)
+  {
+    //// ERROR: Else without matching if
+    return false;
+  }
+  else if (EAT_TOKEN(Token_While))
+  {
+    if (!EAT_TOKEN(Token_OpenParen))
+    {
+      //// ERROR: Missing condition of while statement
+      return false;
+    }
+
+    AST* condition;
+    if (!Parser__ParseExpression(state, &condition)) return false;
+
+    if (!EAT_TOKEN(Token_CloseParen))
+    {
+      //// ERROR: Missing closing paren
+      return false;
+    }
+
+    AST* body;
+    if (!Parser__ParseStatement(state, &body)) return false;
+
+    AST_While_Stmnt* while_stmnt = PUSH_STMNT(AST_While_Stmnt, AST_While);
+    while_stmnt->label     = 0;
+    while_stmnt->condition = condition;
+    while_stmnt->body      = body;
+
+    *stmnt = &while_stmnt->header;
+  }
+  else if (EAT_TOKEN(Token_Return))
+  {
+    AST* args = 0;
+    if (GET_TOKEN().kind != Token_Semicolon)
+    {
+      if (!Parser__ParseArgs(state, &args)) return false;
+    }
+
+    AST_Return_Stmnt* return_stmnt = PUSH_STMNT(AST_Return_Stmnt, AST_Return);
+    return_stmnt->args = args;
+
+    *stmnt = &return_stmnt->header;
+  }
+  else if (EAT_TOKEN(Token_Break))
+  {
+    AST* label = 0;
+    if (GET_TOKEN().kind != Token_Semicolon)
+    {
+      if (!Parser__ParseExpression(state, &label)) return false;
+    }
+
+    AST_Break_Stmnt* break_stmnt = PUSH_STMNT(AST_Break_Stmnt, AST_Break);
+    break_stmnt->label = label;
+
+    *stmnt = &break_stmnt->header;
+  }
+  else if (EAT_TOKEN(Token_Continue))
+  {
+    AST* label = 0;
+    if (GET_TOKEN().kind != Token_Semicolon)
+    {
+      if (!Parser__ParseExpression(state, &label)) return false;
+    }
+
+    AST_Continue_Stmnt* continue_stmnt = PUSH_STMNT(AST_Continue_Stmnt, AST_Continue);
+    continue_stmnt->label = label;
+
+    *stmnt = &continue_stmnt->header;
+  }
+  else
+  {
+    AST* exprs;
+    if (!Parser__ParseCommaSeparatedExpressions(state, &exprs)) return false;
+
+    if (EAT_TOKEN(Token_Colon))
+    {
+      AST* names = exprs;
+      AST* type  = 0;
+
+      if (GET_TOKEN().kind != Token_Colon && GET_TOKEN().kind != Token_EQ)
+      {
+        if (!Parser__ParseExpression(state, &type)) return false;
+      }
+
+      if (EAT_TOKEN(Token_Colon))
+      {
+        AST* values;
+        if (!Parser__ParseCommaSeparatedExpressions(state, &values)) return false;
+
+        AST_Const_Decl* const_decl = PUSH_STMNT(AST_Const_Decl, AST_Const);
+        const_decl->names  = names;
+        const_decl->type   = type;
+        const_decl->values = values;
+
+        *stmnt = &const_decl->header;
+      }
+      else
+      {
+        AST* values = 0;
+        if (EAT_TOKEN(Token_EQ))
+        {
+          if (!Parser__ParseCommaSeparatedExpressions(state, &values)) return false;
+        }
+
+        AST_Var_Decl* var_decl = PUSH_STMNT(AST_Var_Decl, AST_Var);
+        var_decl->names  = names;
+        var_decl->type   = type;
+        var_decl->values = values;
+
+        *stmnt = &var_decl->header;
+      }
+    }
+    else
+    {
+      if (TOKEN_KIND__IS_BINARY_ASSIGNMENT(GET_TOKEN().kind))
+      {
+        AST_Kind ass_kind = (AST_Kind)GET_TOKEN().kind;
+        NEXT_TOKEN();
+
+        AST* lhs = exprs;
+        AST* rhs;
+        if (!Parser__ParseCommaSeparatedExpressions(state, &rhs)) return false;
+
+        AST_Assignment_Stmnt* assignment_stmnt = PUSH_STMNT(AST_Assignment_Stmnt, ass_kind);
+        assignment_stmnt->lhs = lhs;
+        assignment_stmnt->rhs = rhs;
+
+        *stmnt = &assignment_stmnt->header;
+      }
+      else
+      {
+        *stmnt = &exprs->header;
+      }
+    }
+  }
+
   return true;
 }
 
 static bool
-Parser__ParseBlock(Parser* state, AST** block)
+Parser__ParseBlock(Parser* state, AST** stmnt)
 {
   ASSERT(GET_TOKEN().kind == Token_OpenBrace);
   NEXT_TOKEN();
@@ -482,10 +816,16 @@ Parser__ParseBlock(Parser* state, AST** block)
     }
     else
     {
-      if (!Parser_ParseStatement(state, next_stmnt)) return false;
+      if (!Parser__ParseStatement(state, next_stmnt)) return false;
       next_stmnt = &(*next_stmnt)->next;
     }
   }
+
+  AST_Block_Stmnt* block = PUSH_STMNT(AST_Block_Stmnt, AST_Block);
+  block->label = 0;
+  block->body  = body;
+
+  *stmnt = &block->header;
 
   return true;
 }
@@ -493,3 +833,5 @@ Parser__ParseBlock(Parser* state, AST** block)
 #undef GET_TOKEN
 #undef NEXT_TOKEN
 #undef EAT_TOKEN
+#undef PUSH_EXPR
+#undef PUSH_STMNT

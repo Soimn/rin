@@ -5,6 +5,7 @@
 #define TOKEN_KIND__ASS_BIT TOKEN_KIND__BLOCK(8)
 
 #define TOKEN_KIND__IS_BINARY(K) ((u32)((K) - Token__FirstBinary) <= (u32)(Token__PastLastBinary - Token__FirstBinary))
+#define TOKEN_KIND__IS_BINARY_ASSIGNMENT(K) ((u32)((K) - Token__FirstAssignment) <= (u32)(Token__PastLastAssignment - Token__FirstAssignment))
 
 // NOTE: String interning depends on Token_Ident, Token_Blank and all keywords having a value that fits in 16 bits (or in 16 bits from a constant offset)
 typedef enum Token_Kind
@@ -48,8 +49,8 @@ typedef enum Token_Kind
   Token__PastLastLOrLevel,
   Token__PastLastBinary = Token__PastLastLOrLevel,
 
-  Token__FirstBinaryAssignment = TOKEN_KIND__BLOCK(8 + 3),
-  Token__FirstMulLevelAssignment = Token__FirstBinaryAssignment,
+  Token__FirstAssignment = TOKEN_KIND__BLOCK(8 + 3),
+  Token__FirstMulLevelAssignment = Token__FirstAssignment,
   Token_MulEQ = Token__FirstMulLevelAssignment,           // *=
   Token_DivEQ,                                            // /=
   Token_RemEQ,                                            // %=
@@ -75,9 +76,10 @@ typedef enum Token_Kind
   Token__FirstLOrLevelAssignment = TOKEN_KIND__BLOCK(8 + 7),
   Token_LOrEQ = Token__FirstLOrLevelAssignment,           // ||=
   Token__PastLastLOrLevelAssignment,
-  Token__PastLastBinaryAssignment = Token__PastLastLOrLevelAssignment,
 
   Token_EQ,                                               // =
+  Token__PastLastAssignment,
+
   Token_LNot,                                             // !
   Token_Cash,                                             // $
   Token_QMark,                                            // ?

@@ -40,6 +40,7 @@ typedef double f64;
 
 #define ASSERT(EX) ((EX) ? 1 : (__debugbreak(), 0))
 #define NOT_IMPLEMENTED ASSERT(!"NOT_IMPLEMENTED")
+#define UNREACHABLE ASSERT(!"UNREACHABLE")
 
 #define ARRAY_SIZE(A) (sizeof(A)/sizeof(0[A]))
 
