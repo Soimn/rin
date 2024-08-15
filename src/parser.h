@@ -81,7 +81,12 @@ Parser__ParsePrimaryExpression(Parser* state, AST** expr)
 
   if (token.kind == Token_Ident)
   {
-    NOT_IMPLEMENTED;
+    AST_Ident_Expr* ident_expr = PUSH_EXPR(AST_Ident_Expr, AST_Ident);
+    ident_expr->ident = token.ident;
+
+    NEXT_TOKEN();
+
+    *expr = &ident_expr->header;
   }
   else if (token.kind == Token_String)
   {
@@ -237,14 +242,12 @@ Parser__ParsePostfixExpression(Parser* state, AST** expr)
         return false;
       }
 
-      // TODO:
-      NOT_IMPLEMENTED;
+      Ident name = GET_TOKEN().ident;
       NEXT_TOKEN();
 
       AST_Member_Expr* member = PUSH_EXPR(AST_Member_Expr, AST_Member);
       member->operand = *expr;
-      // member->member = ;
-      NOT_IMPLEMENTED;
+      member->name    = name;
 
       *expr = &member->header;
     }

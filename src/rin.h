@@ -55,9 +55,15 @@ typedef union F64_Bits
   f64 f;
 } F64_Bits;
 
+typedef u32 Ident;
+
+void* ReserveMemory(umm size, bool do_commit);
+void CommitMemory(void* base, umm size);
+
 #include "memory.h"
 #include "string.h"
 #include "tokens.h"
 #include "ast.h"
+#include "string_interning.h"
 #include "lexer.h"
 #include "parser.h"

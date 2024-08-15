@@ -4,16 +4,18 @@ typedef struct Lexer
   u8* cursor;
   u8* start_of_line;
   u32 line;
+  Ident_Table* ident_table;
 } Lexer;
 
 static Lexer
-Lexer_Init(u8* file_content)
+Lexer_Init(u8* file_content, Ident_Table* ident_table)
 {
   return (Lexer){
     .input         = file_content,
     .cursor        = file_content,
     .start_of_line = file_content,
     .line          = 1,
+    .ident_table   = ident_table,
   };
 }
 
@@ -259,31 +261,20 @@ Lexer_NextToken(Lexer* lexer)
       {
         if (c == '_' || Char_IsAlpha(c))
         {
+          // TODO: SIMD digest identifiers while hashing
+
           while (*lexer->cursor == '_' || Char_IsAlpha(*lexer->cursor) || Char_IsDigit(*lexer->cursor)) ++lexer->cursor;
 
-          String ident = {
+          String ident_string = {
             .data = start_of_token,
             .len  = lexer->cursor - start_of_token,
           };
 
-          if (ident.len == 1 && *ident.data == '_')
-          {
-            token.kind = Token_Blank;
-          }
-          else
-          {
-            for (umm i = 0; i < ARRAY_SIZE(Token_KeywordStrings); ++i)
-            {
-              if (String_Match(ident, Token_KeywordStrings[i]))
-              {
-                token.kind = Token__FirstKeyword + i;
-                break;
-              }
-            }
+          Token_Kind kind;
+          Ident ident = IdentTable_Put(lexer->ident_table, ident_string, &kind);
 
-            if (token.kind == Token_Invalid) token.kind = Token_Ident;
-            token.string = ident;
-          }
+          token.kind  = kind;
+          token.ident = ident;
         }
         else if (Char_IsDigit(c))
         {
@@ -380,32 +371,7 @@ Lexer_NextToken(Lexer* lexer)
         }
         else if (c == '"' || c == '\'')
         {
-          u8* start_of_string = lexer->cursor;
-
-          while (*lexer->cursor != 0 && *lexer->cursor != '"')
-          {
-            if (*lexer->cursor == '\\') NOT_IMPLEMENTED;
-            lexer->cursor += 1;
-          }
-
-          if (!encountered_errors)
-          {
-            if (*lexer->cursor != '"')
-            {
-              //// ERROR: Unterminated string literal
-              encountered_errors = true;
-            }
-            else
-            {
-              ++lexer->cursor;
-
-              token.kind   = Token_String;
-              token.string = (String){
-                .data = start_of_string,
-                .len  = lexer->cursor - start_of_string,
-              };
-            }
-          }
+          NOT_IMPLEMENTED;
         }
         else
         {

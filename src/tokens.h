@@ -6,6 +6,7 @@
 
 #define TOKEN_KIND__IS_BINARY(K) ((u32)((K) - Token__FirstBinary) <= (u32)(Token__PastLastBinary - Token__FirstBinary))
 
+// NOTE: String interning depends on Token_Ident, Token_Blank and all keywords having a value that fits in 16 bits (or in 16 bits from a constant offset)
 typedef enum Token_Kind
 {
   Token_Invalid = 0,
@@ -131,7 +132,8 @@ typedef struct Token
   {
     u64 integer;
     f64 floating;
-    String string;
+    Ident ident;
+    String_Lit string;
   };
 } Token;
 

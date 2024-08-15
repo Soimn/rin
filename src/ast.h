@@ -147,13 +147,13 @@ typedef AST_Header AST;
 typedef struct AST_Ident_Expr
 {
   AST_HEADER;
-  // TODO:
+  Ident ident;
 } AST_Ident_Expr;
 
 typedef struct AST_String_Expr
 {
   AST_HEADER;
-  // TODO:
+  String_Lit string;
 } AST_String_Expr;
 
 typedef struct AST_Int_Expr
@@ -234,7 +234,7 @@ typedef struct AST_Member_Expr
 {
   AST_HEADER;
   AST* operand;
-  // TODO:
+  Ident name;
 } AST_Member_Expr;
 
 typedef struct AST_Struct_Lit_Expr
