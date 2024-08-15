@@ -1,27 +1,35 @@
 typedef struct Parser
 {
+  Arena* ast_arena;
+  Token token;
   Lexer lexer;
 } Parser;
 
 inline Token
 Parser__GetToken(Parser* state)
 {
-  NOT_IMPLEMENTED;
-  return (Token){0};
+  return state->token;
 }
 
 inline Token
 Parser__NextToken(Parser* state)
 {
-  NOT_IMPLEMENTED;
-  return (Token){0};
+  state->token = Lexer_NextToken(&state->lexer);
+  return state->token;
 }
 
 inline bool
 Parser__EatToken(Parser* state, Token_Kind kind)
 {
-  NOT_IMPLEMENTED;
-  return true;
+  bool result = false;
+
+  if (state->token.kind == kind)
+  {
+    result = true;
+    state->token = Lexer_NextToken(&state->lexer);
+  }
+
+  return result;
 }
 
 #define GET_TOKEN() Parser__GetToken(state)
@@ -31,8 +39,7 @@ Parser__EatToken(Parser* state, Token_Kind kind)
 static void*
 Parser__PushExpr(Parser* state, umm size, u8 alignment, AST_Kind kind)
 {
-  AST* result = 0;
-  NOT_IMPLEMENTED;
+  AST* result = Arena_Push(state->ast_arena, size, alignment);
 
   result->kind = kind;
   result->next = 0;
@@ -43,6 +50,7 @@ Parser__PushExpr(Parser* state, umm size, u8 alignment, AST_Kind kind)
 #define PUSH_EXPR(T, K) Parser__PushExpr(state, sizeof(T), _alignof(T), (K))
 
 static bool Parser__ParseExpression(Parser* state, AST** expr);
+static bool Parser__ParseBlock(Parser* state, AST** block);
 
 static bool
 Parser__ParseArgs(Parser* state, AST** args)
@@ -141,7 +149,19 @@ Parser__ParsePrimaryExpression(Parser* state, AST** expr)
   }
   else if (EAT_TOKEN(Token_Struct))
   {
-    NOT_IMPLEMENTED;
+    if (GET_TOKEN().kind != Token_OpenBrace)
+    {
+      //// ERROR: Missing struct body
+      return false;
+    }
+    
+    AST* body;
+    if (!Parser__ParseBlock(state, &body)) return false;
+
+    AST_Struct_Type_Expr* struct_type = PUSH_EXPR(AST_Struct_Type_Expr, AST_StructType);
+    struct_type->body = body;
+
+    *expr = &struct_type->header;
   }
   else
   {
@@ -435,6 +455,38 @@ static bool
 Parser_ParseStatement(Parser* state, AST** stmnt)
 {
   NOT_IMPLEMENTED;
+  return true;
+}
+
+static bool
+Parser__ParseBlock(Parser* state, AST** block)
+{
+  ASSERT(GET_TOKEN().kind == Token_OpenBrace);
+  NEXT_TOKEN();
+
+  AST* body = 0;
+  AST** next_stmnt = &body;
+  for (;;)
+  {
+    Token token = GET_TOKEN();
+
+    if (token.kind == Token_EOF)
+    {
+      //// ERROR: Unterminated block
+      return false;
+    }
+    else if (token.kind == Token_CloseBrace)
+    {
+      NEXT_TOKEN();
+      break;
+    }
+    else
+    {
+      if (!Parser_ParseStatement(state, next_stmnt)) return false;
+      next_stmnt = &(*next_stmnt)->next;
+    }
+  }
+
   return true;
 }
 

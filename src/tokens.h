@@ -133,7 +133,6 @@ typedef struct Token
     u64 integer;
     f64 floating;
     Ident ident;
-    String_Lit string;
   };
 } Token;
 

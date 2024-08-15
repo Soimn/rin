@@ -153,7 +153,7 @@ typedef struct AST_Ident_Expr
 typedef struct AST_String_Expr
 {
   AST_HEADER;
-  String_Lit string;
+  // TODO:
 } AST_String_Expr;
 
 typedef struct AST_Int_Expr
@@ -195,7 +195,7 @@ typedef struct AST_Proc_Lit_Expr
 typedef struct AST_Struct_Type_Expr
 {
   AST_HEADER;
-  // TODO:
+  AST* body;
 } AST_Struct_Type_Expr;
 
 
