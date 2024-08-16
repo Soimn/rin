@@ -31,13 +31,13 @@ Lexer_NextToken(Lexer* lexer)
     // NOTE: All characters in the range [0x1, 0x20] are considered whitespace
     while ((u8)(*lexer->cursor-1) < (u8)0x20)
     {
-      ++lexer->cursor;
-
       if (*lexer->cursor == '\n')
       {
         lexer->line         += 1;
-        lexer->start_of_line = lexer->cursor;
+        lexer->start_of_line = lexer->cursor + 1;
       }
+
+      ++lexer->cursor;
     }
 
     if (lexer->cursor[0] == '/' && lexer->cursor[1] == '/')
@@ -64,14 +64,13 @@ Lexer_NextToken(Lexer* lexer)
         }
         else
         {
-          ++lexer->cursor;
-
           if (*lexer->cursor == '\n')
           {
             lexer->line         += 1;
-            lexer->start_of_line = lexer->cursor;
+            lexer->start_of_line = lexer->cursor + 1;
           }
 
+          ++lexer->cursor;
         }
       }
     }
@@ -283,10 +282,10 @@ Lexer_NextToken(Lexer* lexer)
 
           if (c == '0')
           {
-            if      (c == 'x') base = 16;
-            else if (c == 'h') base = 16, is_hex_float = true;
-            else if (c == 'o') base = 8;
-            else if (c == 'b') base = 2;
+            if      (*lexer->cursor == 'x') base = 16;
+            else if (*lexer->cursor == 'h') base = 16, is_hex_float = true;
+            else if (*lexer->cursor == 'o') base = 8;
+            else if (*lexer->cursor == 'b') base = 2;
           }
 
           u64 value       = c & 0xF;
@@ -299,7 +298,7 @@ Lexer_NextToken(Lexer* lexer)
           }
 
           bool integer_overflow = false;
-          for (;;)
+          for (;; lexer->cursor += 1)
           {
             u8 digit;
             if      (Char_IsDigit(*lexer->cursor)) digit = *lexer->cursor & 0xF;
@@ -321,7 +320,8 @@ Lexer_NextToken(Lexer* lexer)
             // TODO: better way of checking for overflow
             integer_overflow = (integer_overflow || value < old_value || value + digit < value);
 
-            value += digit;
+            value       += digit;
+            digit_count += 1;
           }
 
           if (!encountered_errors)

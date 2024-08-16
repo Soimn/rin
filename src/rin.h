@@ -38,7 +38,7 @@ typedef u8 bool;
 typedef float f32;
 typedef double f64;
 
-#define ASSERT(EX) ((EX) ? 1 : (__debugbreak(), 0))
+#define ASSERT(EX) ((EX) ? 1 : (__debugbreak(), *(volatile int*)0 = 0))
 #define NOT_IMPLEMENTED ASSERT(!"NOT_IMPLEMENTED")
 #define UNREACHABLE ASSERT(!"UNREACHABLE")
 
@@ -58,8 +58,9 @@ typedef union F64_Bits
 
 typedef u32 Ident;
 
-void* ReserveMemory(umm size, bool do_commit);
-void CommitMemory(void* base, umm size);
+static void* ReserveMemory(umm size, bool do_commit);
+static void CommitMemory(void* base, umm size);
+static void ReleaseMemory(void* reserve_base);
 
 #include "memory.h"
 #include "string.h"

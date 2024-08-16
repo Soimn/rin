@@ -1,16 +1,16 @@
-inline void*
+static void*
 Align(void* ptr, u8 alignment)
 {
   return (void*)(((umm)ptr + (alignment-1)) & ~(alignment-1));
 }
 
-void
+static void
 Copy(void* dst, void* src, umm size)
 {
   for (umm i = 0; i < size; ++i) ((u8*)dst)[i] = ((u8*)src)[i];
 }
 
-void
+static void
 Move(void* dst, void* src, umm size)
 {
   u8* bdst = (u8*)dst;
@@ -24,7 +24,7 @@ typedef struct Arena
 {
   u64 offset;
   u64 committed;
-  u8* memory;
+  u8 memory[];
 } Arena;
 
 // NOTE: Must be a power of 2
@@ -32,18 +32,30 @@ typedef struct Arena
 
 typedef struct { u64 value; } Arena_Marker;
 
-Arena
-Arena_Init(umm reserve_size)
+static Arena*
+Arena_Create(umm reserve_size)
 {
-  void* memory = ReserveMemory(reserve_size, false);
-  return (Arena){
+  Arena* arena = ReserveMemory(reserve_size, false);
+
+  u64 to_commit = 4096;
+  CommitMemory(arena, to_commit);
+
+  *arena = (Arena){
     .offset    = 0,
-    .committed = 0,
-    .memory    = memory,
+    .committed = to_commit - sizeof(Arena),
   };
+
+  return arena;
 }
 
-void*
+static void
+Arena_Destroy(Arena** arena)
+{
+  ReleaseMemory(*arena);
+  *arena = 0;
+}
+
+static void*
 Arena_Push(Arena* arena, umm size, u8 alignment)
 {
   u64 aligned_offset = (arena->offset + (u64)(alignment-1)) & ~(u64)(alignment-1);
@@ -62,32 +74,32 @@ Arena_Push(Arena* arena, umm size, u8 alignment)
   return arena->memory + aligned_offset;
 }
 
-Arena_Marker
+static Arena_Marker
 Arena_GetMarker(Arena* arena)
 {
   return (Arena_Marker){ .value = arena->offset };
 }
 
-void
+static void
 Arena_PopToMarker(Arena* arena, Arena_Marker marker)
 {
   ASSERT(marker.value < arena->offset);
   arena->offset = marker.value;
 }
 
-void
+static void
 Arena_Clear(Arena* arena)
 {
   arena->offset = 0;
 }
 
-void*
+static void*
 Arena_GetBasePointer(Arena* arena)
 {
   return arena->memory;
 }
 
-void*
+static void*
 Arena_GetPointer(Arena* arena)
 {
   return arena->memory + arena->offset;

@@ -5,20 +5,20 @@ typedef struct Parser
   Lexer lexer;
 } Parser;
 
-inline Token
+static Token
 Parser__GetToken(Parser* state)
 {
   return state->token;
 }
 
-inline Token
+static Token
 Parser__NextToken(Parser* state)
 {
   state->token = Lexer_NextToken(&state->lexer);
   return state->token;
 }
 
-inline bool
+static bool
 Parser__EatToken(Parser* state, Token_Kind kind)
 {
   bool result = false;
@@ -62,6 +62,9 @@ Parser__PushStmnt(Parser* state, umm size, u8 alignment, AST_Kind kind)
 
 #define PUSH_STMNT(T, K) Parser__PushStmnt(state, sizeof(T), _alignof(T), (K))
 
+// TODO: Temp
+#define PARSER_ERROR() __debugbreak()
+
 static bool Parser__ParseExpression(Parser* state, AST** expr);
 static bool Parser__ParsePrimaryExpression(Parser* state, AST** expr);
 static bool Parser__ParseBlock(Parser* state, AST** block);
@@ -89,7 +92,7 @@ Parser__ParseArgs(Parser* state, AST** args)
     *args = &argument->header;
     args = &argument->next;
 
-    if (EAT_TOKEN(Token_Colon)) continue;
+    if (EAT_TOKEN(Token_Comma)) continue;
     else                        break;
   }
 
@@ -155,7 +158,7 @@ Parser__ParsePrimaryExpression(Parser* state, AST** expr)
 
     *expr = &bool_expr->header;
   }
-  else if (token.kind == Token_OpenParen)
+  else if (EAT_TOKEN(Token_OpenParen))
   {
     AST* inner;
     if (!Parser__ParseExpression(state, &inner)) return false;
@@ -168,6 +171,7 @@ Parser__ParsePrimaryExpression(Parser* state, AST** expr)
     if (!EAT_TOKEN(Token_CloseParen))
     {
       //// ERROR: Missing close paren
+      PARSER_ERROR();
       return false;
     }
   }
@@ -179,6 +183,7 @@ Parser__ParsePrimaryExpression(Parser* state, AST** expr)
     if (!EAT_TOKEN(Token_OpenParen))
     {
       //// ERROR: Missing parameter list
+      PARSER_ERROR();
       return false;
     }
 
@@ -195,6 +200,7 @@ Parser__ParsePrimaryExpression(Parser* state, AST** expr)
         if (!EAT_TOKEN(Token_Colon))
         {
           //// ERROR: Missing type of parameters
+          PARSER_ERROR();
           return false;
         }
 
@@ -223,6 +229,7 @@ Parser__ParsePrimaryExpression(Parser* state, AST** expr)
     if (!EAT_TOKEN(Token_CloseParen))
     {
       //// ERROR: Missing closing paren
+      PARSER_ERROR();
       return false;
     }
 
@@ -247,6 +254,7 @@ Parser__ParsePrimaryExpression(Parser* state, AST** expr)
           if (!EAT_TOKEN(Token_Colon))
           {
             //// ERROR: Missing type of parameters
+            PARSER_ERROR();
             return false;
           }
 
@@ -274,6 +282,7 @@ Parser__ParsePrimaryExpression(Parser* state, AST** expr)
         if (!EAT_TOKEN(Token_CloseParen))
         {
           //// ERROR: Missing close paren
+          PARSER_ERROR();
           return false;
         }
       }
@@ -305,6 +314,7 @@ Parser__ParsePrimaryExpression(Parser* state, AST** expr)
     if (GET_TOKEN().kind != Token_OpenBrace)
     {
       //// ERROR: Missing struct body
+      PARSER_ERROR();
       return false;
     }
     
@@ -321,11 +331,13 @@ Parser__ParsePrimaryExpression(Parser* state, AST** expr)
     if (token.kind == Token_Invalid)
     {
       //// ERROR
+      PARSER_ERROR();
       return false;
     }
     else
     {
       //// ERROR: Missing primary expression
+      PARSER_ERROR();
       return false;
     }
   }
@@ -360,6 +372,7 @@ Parser__ParsePostfixExpression(Parser* state, AST** expr)
       if (!EAT_TOKEN(Token_CloseParen))
       {
         //// ERROR: Missing closing paren
+        PARSER_ERROR();
         return false;
       }
 
@@ -404,6 +417,7 @@ Parser__ParsePostfixExpression(Parser* state, AST** expr)
       if (!EAT_TOKEN(Token_CloseBracket))
       {
         //// ERROR: Missing closing bracket
+        PARSER_ERROR();
         return false;
       }
     }
@@ -429,6 +443,7 @@ Parser__ParsePostfixExpression(Parser* state, AST** expr)
       if (!EAT_TOKEN(Token_CloseBrace))
       {
         //// ERROR: Missing closing brace
+        PARSER_ERROR();
         return false;
       }
 
@@ -465,6 +480,7 @@ Parser__ParsePrefixExpression(Parser* state, AST** expr)
         if (!EAT_TOKEN(Token_CloseBracket))
         {
           //// ERROR: Missing closing bracket after "array of" prefix operator
+          PARSER_ERROR();
           return false;
         }
 
@@ -538,7 +554,7 @@ Parser__ParseBinaryExpression(Parser* state, AST** expr)
       if (!TOKEN_KIND__IS_BINARY(peek_kind)) break;
       else
       {
-        u32 peek_block_idx = AST_KIND__BLOCK_IDX(peek_block_idx);
+        u32 peek_block_idx = AST_KIND__BLOCK_IDX(peek_kind);
 
         if (peek_block_idx < op_block_idx)
         {
@@ -575,6 +591,7 @@ Parser__ParseExpression(Parser* state, AST** expr)
     if (!EAT_TOKEN(Token_Colon))
     {
       //// ERROR: Missing else clause of conditional expression
+      PARSER_ERROR();
       return false;
     }
 
@@ -592,7 +609,7 @@ Parser__ParseExpression(Parser* state, AST** expr)
 }
 
 static bool
-Parser__ParseStatement(Parser* state, AST** stmnt)
+Parser__ParseStatement(Parser* state, bool check_for_semi, AST** stmnt)
 {
   if (EAT_TOKEN(Token_Colon))
   {
@@ -603,10 +620,11 @@ Parser__ParseStatement(Parser* state, AST** stmnt)
     if (token.kind != Token_OpenBrace && token.kind != Token_If && token.kind != Token_While)
     {
       //// ERROR: Labels may only be applied to block, if and while statements
+      PARSER_ERROR();
       return false;
     }
 
-    if (!Parser__ParseStatement(state, stmnt)) return false;
+    if (!Parser__ParseStatement(state, true, stmnt)) return false;
 
     if      ((*stmnt)->kind == AST_Block) ((AST_Block_Stmnt*)*stmnt)->label = label;
     else if ((*stmnt)->kind == AST_If)    ((AST_If_Stmnt*)*stmnt)->label    = label;
@@ -622,6 +640,7 @@ Parser__ParseStatement(Parser* state, AST** stmnt)
     if (!EAT_TOKEN(Token_OpenParen))
     {
       //// ERROR: Missing condition of if statement
+      PARSER_ERROR();
       return false;
     }
 
@@ -631,16 +650,17 @@ Parser__ParseStatement(Parser* state, AST** stmnt)
     if (!EAT_TOKEN(Token_CloseParen))
     {
       //// ERROR: Missing closing paren
+      PARSER_ERROR();
       return false;
     }
 
     AST* true_body;
-    if (!Parser__ParseStatement(state, &true_body)) return false;
+    if (!Parser__ParseStatement(state, true, &true_body)) return false;
 
     AST* false_body = 0;
     if (EAT_TOKEN(Token_Else))
     {
-      if (!Parser__ParseStatement(state, &false_body)) return false;
+      if (!Parser__ParseStatement(state, true, &false_body)) return false;
     }
 
     AST_If_Stmnt* if_stmnt = PUSH_STMNT(AST_If_Stmnt, AST_If);
@@ -654,6 +674,7 @@ Parser__ParseStatement(Parser* state, AST** stmnt)
   else if (GET_TOKEN().kind == Token_Else)
   {
     //// ERROR: Else without matching if
+    PARSER_ERROR();
     return false;
   }
   else if (EAT_TOKEN(Token_While))
@@ -661,6 +682,7 @@ Parser__ParseStatement(Parser* state, AST** stmnt)
     if (!EAT_TOKEN(Token_OpenParen))
     {
       //// ERROR: Missing condition of while statement
+      PARSER_ERROR();
       return false;
     }
 
@@ -670,11 +692,12 @@ Parser__ParseStatement(Parser* state, AST** stmnt)
     if (!EAT_TOKEN(Token_CloseParen))
     {
       //// ERROR: Missing closing paren
+      PARSER_ERROR();
       return false;
     }
 
     AST* body;
-    if (!Parser__ParseStatement(state, &body)) return false;
+    if (!Parser__ParseStatement(state, true, &body)) return false;
 
     AST_While_Stmnt* while_stmnt = PUSH_STMNT(AST_While_Stmnt, AST_While);
     while_stmnt->label     = 0;
@@ -789,6 +812,18 @@ Parser__ParseStatement(Parser* state, AST** stmnt)
     }
   }
 
+  AST_Kind stmnt_kind = (*stmnt)->kind;
+  if (check_for_semi &&
+      (stmnt_kind != AST_Block && stmnt_kind != AST_If && stmnt_kind != AST_While))
+  {
+    if (!EAT_TOKEN(Token_Semicolon))
+    {
+      //// ERROR: Missing semicolon
+      PARSER_ERROR();
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -802,11 +837,14 @@ Parser__ParseBlock(Parser* state, AST** stmnt)
   AST** next_stmnt = &body;
   for (;;)
   {
+    while (EAT_TOKEN(Token_Semicolon));
+
     Token token = GET_TOKEN();
 
     if (token.kind == Token_EOF)
     {
       //// ERROR: Unterminated block
+      PARSER_ERROR();
       return false;
     }
     else if (token.kind == Token_CloseBrace)
@@ -816,7 +854,7 @@ Parser__ParseBlock(Parser* state, AST** stmnt)
     }
     else
     {
-      if (!Parser__ParseStatement(state, next_stmnt)) return false;
+      if (!Parser__ParseStatement(state, true, next_stmnt)) return false;
       next_stmnt = &(*next_stmnt)->next;
     }
   }
@@ -826,6 +864,57 @@ Parser__ParseBlock(Parser* state, AST** stmnt)
   block->body  = body;
 
   *stmnt = &block->header;
+
+  return true;
+}
+
+static bool
+Parser_ParseFile(Arena* ast_arena, Ident_Table* ident_table, u8* file_contents, AST** ast, u64* debug_lines)
+{
+  Parser _parser = {
+    .ast_arena = ast_arena,
+    .lexer     = Lexer_Init(file_contents, ident_table),
+  };
+
+  _parser.token = Lexer_NextToken(&_parser.lexer);
+
+  Parser* state = &_parser;
+
+  *ast = 0;
+  AST** next_stmnt = ast;
+
+  while (GET_TOKEN().kind != Token_EOF)
+  {
+    while (EAT_TOKEN(Token_Semicolon));
+
+    if (!Parser__ParseStatement(state, false, next_stmnt)) return false;
+
+    bool require_semicolon = true;
+
+    AST_Kind stmnt_kind = (*next_stmnt)->kind;
+    if      (stmnt_kind == AST_Block || stmnt_kind == AST_If || stmnt_kind == AST_While) require_semicolon = false;
+    else if (stmnt_kind == AST_Const)
+    {
+      AST_Const_Decl* const_decl = (AST_Const_Decl*)*next_stmnt;
+
+      if (const_decl->values != 0 && const_decl->values->next == 0 && (const_decl->values->kind == AST_ProcLit ||
+                                                                       const_decl->values->kind == AST_StructType))
+      {
+        require_semicolon = false;
+      }
+    }
+
+    if (require_semicolon && !EAT_TOKEN(Token_Semicolon))
+    {
+      //// ERROR: Missing semicolon
+      PARSER_ERROR();
+      return false;
+    }
+
+    next_stmnt = &(*next_stmnt)->next;
+  }
+
+  *debug_lines = GET_TOKEN().line;
 
   return true;
 }

@@ -9,3 +9,5 @@ something like the zero length array for labels to memory locations
 ergonomic mix of assembly, intrinsics and regular code
 
 try chunked lexing
+
+better error messages on expr{} instead of expr.{}

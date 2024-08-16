@@ -1,0 +1,27 @@
+fib :: proc(n: int) -> int
+{
+  if (n <= 1) return 1;
+  else        return fib(n-1) + fib(n-2);
+}
+
+main :: proc(argc: int, argv: ^^u8) -> int
+{
+  succeeded := false;
+  n         := 0;
+
+  if (argc == 2)
+  {
+    cursor := argv[1];
+
+    while (cursor^ - 0x30 < 10)
+    {
+      n = n*10 + cursor^ & 0xF;
+      cursor += 1;
+    }
+
+    if (cursor^ == 0) succeeded = true;
+  }
+
+  if (!succeeded) return -1;
+  else            return fib(n);
+}
