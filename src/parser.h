@@ -784,7 +784,7 @@ Parser__ParseStatement(Parser* state, AST** stmnt)
       }
       else
       {
-        *stmnt = &exprs->header;
+        *stmnt = exprs;
       }
     }
   }

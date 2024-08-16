@@ -52,7 +52,7 @@ IdentTable_Put(Ident_Table* table, String string, Token_Kind* kind)
 
   Ident_Entry* entry = &table->entries[idx];
 
-  while (entry->hash != 0)
+  while (entry->kind != 0)
   {
     if (entry->hash == hash)
     {
@@ -69,7 +69,7 @@ IdentTable_Put(Ident_Table* table, String string, Token_Kind* kind)
     idx = (idx + 1) & ~(1ULL << IDENT_TABLE_SIZE_LG2);
   }
 
-  if (entry->hash == 0)
+  if (entry->kind == 0)
   {
     Interned_String* istring = Arena_Push(&table->string_arena, sizeof(Interned_String) + string.len, _alignof(Interned_String));
     istring->len = (u32)string.len;
