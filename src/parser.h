@@ -521,7 +521,7 @@ Parser__ParsePrefixExpression(Parser* state, AST** expr)
   return Parser__ParsePostfixExpression(state, expr);
 }
 
-#if 0
+#if 1
 static bool
 Parser__ParseBinaryExpression(Parser* state, AST** expr)
 {
@@ -578,7 +578,7 @@ Parser__ParseBinaryExpression(Parser* state, AST** expr)
 
   return true;
 }
-#elif 0
+#elif
 static bool
 Parser__ParseBinaryExpression(Parser* state, AST** expr)
 {
@@ -601,101 +601,6 @@ Parser__ParseBinaryExpression(Parser* state, AST** expr)
     op->right = right;
 
     *slot = &op->header;
-  }
-
-  return true;
-}
-#else
-static bool
-Parser__ParseMulLevelExpression(Parser* state, AST** expr)
-{
-  if (!Parser__ParsePrefixExpression(state, expr)) return false;
-
-  while ((u32)(GET_TOKEN().kind - Token__FirstMulLevel) <= (u32)(Token__PastLastMulLevel - Token__FirstMulLevel))
-  {
-    AST_Binary_Expr* op = PUSH_EXPR(AST_Binary_Expr, (AST_Kind)GET_TOKEN().kind);
-    op->left = *expr;
-
-    NEXT_TOKEN();
-
-    if (!Parser__ParsePrefixExpression(state, &op->right)) return false;
-
-    *expr = &op->header;
-  }
-
-  return true;
-}
-static bool
-Parser__ParseAddLevelExpression(Parser* state, AST** expr)
-{
-  if (!Parser__ParseMulLevelExpression(state, expr)) return false;
-
-  while ((u32)(GET_TOKEN().kind - Token__FirstAddLevel) <= (u32)(Token__PastLastAddLevel - Token__FirstAddLevel))
-  {
-    AST_Binary_Expr* op = PUSH_EXPR(AST_Binary_Expr, (AST_Kind)GET_TOKEN().kind);
-    op->left = *expr;
-
-    NEXT_TOKEN();
-
-    if (!Parser__ParseMulLevelExpression(state, &op->right)) return false;
-
-    *expr = &op->header;
-  }
-
-  return true;
-}
-
-static bool
-Parser__ParseCmpLevelExpression(Parser* state, AST** expr)
-{
-  if (!Parser__ParseAddLevelExpression(state, expr)) return false;
-
-  while ((u32)(GET_TOKEN().kind - Token__FirstCmpLevel) <= (u32)(Token__PastLastCmpLevel - Token__FirstCmpLevel))
-  {
-    AST_Binary_Expr* op = PUSH_EXPR(AST_Binary_Expr, (AST_Kind)GET_TOKEN().kind);
-    op->left = *expr;
-
-    NEXT_TOKEN();
-
-    if (!Parser__ParseAddLevelExpression(state, &op->right)) return false;
-
-    *expr = &op->header;
-  }
-
-  return true;
-}
-
-static bool
-Parser__ParseLAndLevelExpression(Parser* state, AST** expr)
-{
-  if (!Parser__ParseCmpLevelExpression(state, expr)) return false;
-
-  while (EAT_TOKEN(Token_LAnd))
-  {
-    AST_Binary_Expr* op = PUSH_EXPR(AST_Binary_Expr, AST_LAnd);
-    op->left = *expr;
-
-    if (!Parser__ParseCmpLevelExpression(state, &op->right)) return false;
-
-    *expr = &op->header;
-  }
-
-  return true;
-}
-
-static bool
-Parser__ParseBinaryExpression(Parser* state, AST** expr)
-{
-  if (!Parser__ParseLAndLevelExpression(state, expr)) return false;
-
-  while (EAT_TOKEN(Token_LOr))
-  {
-    AST_Binary_Expr* op = PUSH_EXPR(AST_Binary_Expr, AST_LOr);
-    op->left = *expr;
-
-    if (!Parser__ParseLAndLevelExpression(state, &op->right)) return false;
-
-    *expr = &op->header;
   }
 
   return true;
