@@ -1,7 +1,6 @@
 #define AST_KIND__BLOCK_SIZE_LG2 6
 #define AST_KIND__BLOCK(N) ((N) << AST_KIND__BLOCK_SIZE_LG2)
 #define AST_KIND__BLOCK_IDX(N) ((N) >> AST_KIND__BLOCK_SIZE_LG2)
-#define AST_KIND__BLOCK_OFFSET(N) ((N) & ~(AST_KIND__BLOCK_SIZE_LG2-1))
 #define AST_KIND__FirstBinaryBlockIDX 3
 #define AST_KIND__PastLastBinaryBlockIDX 8
 
