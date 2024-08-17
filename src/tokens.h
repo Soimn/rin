@@ -13,9 +13,9 @@ typedef enum Token_Kind
   Token_Invalid = 0,
   Token_EOF,
 
-  Token__FirstBinary = TOKEN_KIND__BLOCK(3),
+  Token_Mul = TOKEN_KIND__BLOCK(3),                       // *
+  Token__FirstBinary = Token_Mul,
   Token__FirstMulLevel = Token__FirstBinary,
-  Token_Mul = Token__FirstMulLevel,                       // *
   Token_Div,                                              // /
   Token_Rem,                                              // %
   Token_And,                                              // &
@@ -24,15 +24,15 @@ typedef enum Token_Kind
   Token_Sar,                                              // >>>
   Token__PastLastMulLevel,
 
-  Token__FirstAddLevel = TOKEN_KIND__BLOCK(4),
-  Token_Add = Token__FirstAddLevel,                       // +
+  Token_Add = TOKEN_KIND__BLOCK(4),                       // +
+  Token__FirstAddLevel = Token_Add,
   Token_Sub,                                              // -
   Token_Or,                                               // |
   Token_Xor,                                              // ~
   Token__PastLastAddLevel,
 
-  Token__FirstCmpLevel = TOKEN_KIND__BLOCK(5),
-  Token_EQEQ = Token__FirstCmpLevel,                      // ==
+  Token_EQEQ = TOKEN_KIND__BLOCK(5),                      // ==
+  Token__FirstCmpLevel = Token_EQEQ,
   Token_LNotEQ,                                           // !=
   Token_Le,                                               // <
   Token_LeEQ,                                             // <=
@@ -40,18 +40,18 @@ typedef enum Token_Kind
   Token_GeEQ,                                             // >=
   Token__PastLastCmpLevel,
 
-  Token__FirstLAndLevel = TOKEN_KIND__BLOCK(6),
-  Token_LAnd = Token__FirstLAndLevel,                     // &&
+  Token_LAnd = TOKEN_KIND__BLOCK(6),                      // &&
+  Token__FirstLAndLevel = Token_LAnd,
   Token__PastLastLAndLevel,
 
-  Token__FirstLOrLevel = TOKEN_KIND__BLOCK(7),
-  Token_LOr = Token__FirstLOrLevel,                       // ||
+  Token_LOr = TOKEN_KIND__BLOCK(7),                       // ||
+  Token__FirstLOrLevel = Token_LOr,
   Token__PastLastLOrLevel,
   Token__PastLastBinary = Token__PastLastLOrLevel,
 
-  Token__FirstAssignment = TOKEN_KIND__BLOCK(8 + 3),
+  Token_MulEQ = TOKEN_KIND__BLOCK(8 + 3),                 // *=
+  Token__FirstAssignment = Token_MulEQ,
   Token__FirstMulLevelAssignment = Token__FirstAssignment,
-  Token_MulEQ = Token__FirstMulLevelAssignment,           // *=
   Token_DivEQ,                                            // /=
   Token_RemEQ,                                            // %=
   Token_AndEQ,                                            // &=
@@ -60,8 +60,8 @@ typedef enum Token_Kind
   Token_SarEQ,                                            // >>>=
   Token__PastLastMulLevelAssignment,
 
-  Token__FirstAddLevelAssignment = TOKEN_KIND__BLOCK(8 + 4),
-  Token_AddEQ = Token__FirstAddLevelAssignment,           // +=
+  Token_AddEQ = TOKEN_KIND__BLOCK(8 + 4),                 // +=
+  Token__FirstAddLevelAssignment = Token_AddEQ,
   Token_SubEQ,                                            // -=
   Token_OrEQ,                                             // |=
   Token_XorEQ,                                            // ~=
@@ -69,12 +69,12 @@ typedef enum Token_Kind
 
   // NOTE: 8 + 6 is not used since there are no cmp assignment expressions
 
-  Token__FirstLAndLevelAssignment = TOKEN_KIND__BLOCK(8 + 6),
-  Token_LAndEQ = Token__FirstLAndLevelAssignment,         // &&=
+  Token_LAndEQ = TOKEN_KIND__BLOCK(8 + 6),                // &&=
+  Token__FirstLAndLevelAssignment = Token_LAndEQ,
   Token__PastLastLAndLevelAssignment,
 
-  Token__FirstLOrLevelAssignment = TOKEN_KIND__BLOCK(8 + 7),
-  Token_LOrEQ = Token__FirstLOrLevelAssignment,           // ||=
+  Token_LOrEQ = TOKEN_KIND__BLOCK(8 + 7),                 // ||=
+  Token__FirstLOrLevelAssignment = Token_LOrEQ,
   Token__PastLastLOrLevelAssignment,
 
   Token_EQ,                                               // =

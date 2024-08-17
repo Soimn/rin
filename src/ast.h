@@ -9,9 +9,9 @@ typedef enum AST_Kind
 {
   AST_Invalid = 0,
 
-  AST__FirstExpr,
-  AST__FirstPrimitiveLevel = AST__FirstExpr,
   AST_Ident,
+  AST__FirstExpr = AST_Ident,
+  AST__FirstPrimitiveLevel = AST__FirstExpr,
   AST_String,
   AST_Int,
   AST_Float,
@@ -22,8 +22,8 @@ typedef enum AST_Kind
   AST_ProcLit,
   AST__PastLastPrimitiveLevel,
 
-  AST__FirstPostfixLevel = AST_KIND__BLOCK(1),
-  AST_Deref = AST__FirstPostfixLevel,
+  AST_Deref = AST_KIND__BLOCK(1),
+  AST__FirstPostfixLevel = AST_Deref,
   AST_Call,
   AST_Slice,
   AST_Index,
@@ -31,8 +31,8 @@ typedef enum AST_Kind
   AST_StructLit,
   AST__PastLastPostfixLevel,
 
-  AST__FirstPrefixLevel = AST_KIND__BLOCK(2),
-  AST_Pos = AST__FirstPrefixLevel,
+  AST_Pos = AST_KIND__BLOCK(2),
+  AST__FirstPrefixLevel = AST_Pos,
   AST_Neg,
   AST_LNot,
   AST_Not,
@@ -42,9 +42,9 @@ typedef enum AST_Kind
   AST_ArrayOf,
   AST__PastLastPrefixLevel,
 
-  AST__FirstBinaryExpr = AST_KIND__BLOCK(3),
+  AST_Mul = AST_KIND__BLOCK(3),
+  AST__FirstBinaryExpr = AST_Mul,
   AST__FirstMulLevel = AST__FirstBinaryExpr,
-  AST_Mul = AST__FirstMulLevel,
   AST_Div,
   AST_Rem,
   AST_And,
@@ -53,15 +53,15 @@ typedef enum AST_Kind
   AST_Sar,
   AST__PastLastMulLevel,
 
-  AST__FirstAddLevel = AST_KIND__BLOCK(4),
-  AST_Add = AST__FirstAddLevel,
+  AST_Add = AST_KIND__BLOCK(4),
+  AST__FirstAddLevel = AST_Add,
   AST_Sub,
   AST_Or,
   AST_Xor,
   AST__PastLastAddLevel,
 
-  AST__FirstCmpLevel = AST_KIND__BLOCK(5),
-  AST_CmpEQ = AST__FirstCmpLevel,
+  AST_CmpEQ = AST_KIND__BLOCK(5),
+  AST__FirstCmpLevel = AST_CmpEQ,
   AST_CmpNeq,
   AST_CmpLe,
   AST_CmpLeEQ,
@@ -69,12 +69,12 @@ typedef enum AST_Kind
   AST_CmpGeEQ,
   AST__PastLastCmpLevel,
 
-  AST__FirstLAndLevel = AST_KIND__BLOCK(6),
-  AST_LAnd = AST__FirstLAndLevel,
+  AST_LAnd = AST_KIND__BLOCK(6),
+  AST__FirstLAndLevel = AST_LAnd,
   AST__PastLastLAndLevel,
 
-  AST__FirstLOrLevel = AST_KIND__BLOCK(7),
-  AST_LOr = AST__FirstLOrLevel,
+  AST_LOr = AST_KIND__BLOCK(7),
+  AST__FirstLOrLevel = AST_LOr,
   AST__PastLastLOrLevel,
 
   AST__PastLastBinaryExpr = AST_KIND__BLOCK(8),
@@ -83,22 +83,22 @@ typedef enum AST_Kind
 
   AST__PastLastExpr,
 
-  AST__FirstDecl,
-  AST_Var = AST__FirstDecl,
+  AST_Var,
+  AST__FirstDecl = AST_Var,
   AST_Const,
   AST__PastLastDecl,
 
-  AST__FirstStmnt,
-  AST_Block = AST__FirstStmnt,
+  AST_Block,
+  AST__FirstStmnt = AST_Block,
   AST_If,
   AST_While,
   AST_Return,
   AST_Break,
   AST_Continue,
 
-  AST__FirstAssignment = AST_KIND__BLOCK(8 + 3),
+  AST_MulEQ = AST_KIND__BLOCK(8 + 3),
+  AST__FirstAssignment = AST_MulEQ,
   AST__FirstMulLevelAssignment = AST__FirstAssignment,
-  AST_MulEQ = AST__FirstMulLevelAssignment,
   AST_DivEQ,
   AST_RemEQ,
   AST_AndEQ,
@@ -107,8 +107,8 @@ typedef enum AST_Kind
   AST_SarEQ,
   AST__PastLastMulLevelAssignment,
 
-  AST__FirstAddLevelAssignment = AST_KIND__BLOCK(8 + 4),
-  AST_AddEQ = AST__FirstAddLevelAssignment,
+  AST_AddEQ = AST_KIND__BLOCK(8 + 4),
+  AST__FirstAddLevelAssignment = AST_AddEQ,
   AST_SubEQ,
   AST_OrEQ,
   AST_XorEQ,
@@ -116,20 +116,20 @@ typedef enum AST_Kind
 
   // NOTE: 8 + 6 is not used since there are no cmp assignment expressions
 
-  AST__FirstLAndLevelAssignment = AST_KIND__BLOCK(8 + 6),
-  AST_LAndEQ = AST__FirstLAndLevelAssignment,
+  AST_LAndEQ = AST_KIND__BLOCK(8 + 6),
+  AST__FirstLAndLevelAssignment = AST_LAndEQ,
   AST__PastLastLAndLevelAssignment,
 
-  AST__FirstLOrLevelAssignment = AST_KIND__BLOCK(8 + 7),
-  AST_LOrEQ = AST__FirstLOrLevelAssignment,
+  AST_LOrEQ = AST_KIND__BLOCK(8 + 7),
+  AST__FirstLOrLevelAssignment = AST_LOrEQ,
   AST__PastLastLOrLevelAssignment,
 
   AST_EQ,
   AST__PastLastAssignment,
   AST__PastLastStmnt = AST__PastLastAssignment,
 
-  AST__FirstSpecial,
-  AST_Arg = AST__FirstSpecial,
+  AST_Arg,
+  AST__FirstSpecial = AST_Arg,
   AST_Param,
   AST_RetType,
   AST__PastLastSpecial,
