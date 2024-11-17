@@ -27,7 +27,7 @@ if "%1"=="debug" (
 
 if "%2" neq "" goto invalid_arguments
 
-cl %compile_options% ..\src\main.c /link %link_options% /pdb:rin.pdb /out:rin.exe
+cl %compile_options% ..\src\main.c /link %link_options% /pdb:rin.pdb /out:rin.exe user32.lib
 
 goto end
 

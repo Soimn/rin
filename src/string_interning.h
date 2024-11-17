@@ -1,4 +1,3 @@
-
 // Taken from http://www.isthe.com/chongo/tech/comp/fnv/index.html#FNV-1a
 // Licensed under CC0 Public Domain
 static u64
@@ -15,19 +14,6 @@ FNV1A(String string)
   return hash;
 }
 
-typedef struct Interned_String
-{
-  u32 len;
-  u8 data[];
-} Interned_String;
-
-typedef struct Ident_Entry
-{
-  u64 hash;
-  u32 string_idx;
-  u16 kind;
-} Ident_Entry;
-
 // NOTE: From scraping the Linux kernel and driver source code it seems like
 //       4 million unique identifiers is a reasonable cap, doubling this
 //       results in a memory footprint of ~128 MB, which is nothing. It
@@ -35,142 +21,98 @@ typedef struct Ident_Entry
 //       Especially since writing more than 48 Mloc of linux like code is
 //       insane.
 #define IDENT_TABLE_SIZE_LG2 23
+#define IDENT_TABLE_MASK ((1ULL << IDENT_TABLE_SIZE_LG2) - 1)
+
+typedef u32 Ident;
+
+typedef struct Interned_String
+{
+	u32 len;
+	u8 data[];
+} Interned_String;
+
+static bool
+InternedString_MatchString(Interned_String* s0, String s1)
+{
+	bool result = (s0->len == s1.len);
+
+	for (u32 i = 0; i < s0->len && result; ++i) result = (s0->data[i] == s1.data[i]);
+
+	return result;
+}
+
+typedef struct Ident_Table_Entry
+{
+	u64 hash;
+	u32 string_idx;
+	Token_Kind kind;
+} Ident_Table_Entry;
 
 typedef struct Ident_Table
 {
-  Arena* string_arena;
-  u32 entry_count;
-  Ident_Entry entries[1ULL << IDENT_TABLE_SIZE_LG2];
+	Arena* string_arena;
+	Interned_String* strings;
+	Ident_Table_Entry entries[1 << IDENT_TABLE_SIZE_LG2];
 } Ident_Table;
 
-#if 0
-
-// TODO: temporary API
-static Ident
-IdentTable_Put(Ident_Table* table, String string, Token_Kind* kind)
+u64
+IdentTable_Hash(String string)
 {
-  u64 hash = FNV1A(string);
-  u64 idx  = ((hash >> IDENT_TABLE_SIZE_LG2) ^ hash) & ((1ULL << IDENT_TABLE_SIZE_LG2) - 1);
-
-  Ident_Entry* entry = &table->entries[idx];
-
-  while (entry->kind != 0)
-  {
-    if (entry->hash == hash)
-    {
-      Interned_String* ientry = (Interned_String*)Arena_GetBasePointer(table->string_arena) + entry->string_idx;
-      
-      String ientry_string = (String){ .data = ientry->data, .len = ientry->len };
-
-      if (String_Match(ientry_string, string))
-      {
-        break;
-      }
-    }
-
-    idx = (idx + 1) & ((1ULL << IDENT_TABLE_SIZE_LG2) - 1);
-  }
-
-  if (entry->kind == 0)
-  {
-    Interned_String* istring = Arena_Push(table->string_arena, sizeof(Interned_String) + string.len, _alignof(Interned_String));
-    istring->len = (u32)string.len;
-    Copy(istring->data, string.data, string.len);
-
-    u32 string_idx = (u32)(istring - (Interned_String*)Arena_GetBasePointer(table->string_arena));
-
-    *entry = (Ident_Entry){
-      .hash       = hash,
-      .string_idx = string_idx,
-      .kind       = Token_Ident,
-    };
-
-    table->entry_count += 1;
-    ASSERT(table->entry_count < 0.7f*(1ULL << IDENT_TABLE_SIZE_LG2));
-  }
-
-  *kind = table->entries[idx].kind;
-  return (Ident)idx;
+	return FNV1A(string);
 }
 
-#else
-
-#define IDENT_TABLE_BUCKET_SIZE_LG2 12
-
-static Ident
-IdentTable_Put(Ident_Table* table, String string, Token_Kind* kind)
+Ident
+IdentTable_Put(Ident_Table* table, u64 hash, String string, Token_Kind* kind)
 {
-  u64 hash = FNV1A(string);
-  u64 idx  = ((hash >> IDENT_TABLE_BUCKET_SIZE_LG2) ^ hash) & ((1ULL << IDENT_TABLE_BUCKET_SIZE_LG2) - 1);
+	u32 idx = hash & IDENT_TABLE_MASK;
+	if (hash == 0) hash = 1;
 
-  for (;; ++idx)
-  {
-    Ident_Entry* entry = &table->entries[idx];
+	u32 step = 1;
+	while (table->entries[idx].hash != 0)
+	{
+		if (InternedString_MatchString(table->strings + table->entries[idx].string_idx, string))
+		{
+			break;
+		}
 
-    if      (entry->kind == 0) break;
-    else if (entry->hash == hash)
-    {
-      Interned_String* ientry = (Interned_String*)Arena_GetBasePointer(table->string_arena) + entry->string_idx;
-      
-      String ientry_string = (String){ .data = ientry->data, .len = ientry->len };
+		idx = (idx + step++) & IDENT_TABLE_MASK;
+	}
 
-      if (String_Match(ientry_string, string))
-      {
-        break;
-      }
-    }
-  }
+	if (table->entries[idx].hash == 0)
+	{
+		Interned_String* s = Arena_Push(table->string_arena, sizeof(Interned_String) + string.len, ALIGNOF(Interned_String));
+		s->len = string.len;
+		Copy(s->data, string.data, s->len);
 
-  Ident_Entry* entry = &table->entries[idx];
+		table->entries[idx] = (Ident_Table_Entry){
+			.hash       = hash,
+			.string_idx = (u32)(s - table->strings),
+			.kind       = Token_Ident,
+		};
+	}
 
-  if (entry->kind == 0)
-  {
-    Interned_String* istring = Arena_Push(table->string_arena, sizeof(Interned_String) + string.len, _alignof(Interned_String));
-    istring->len = (u32)string.len;
-    Copy(istring->data, string.data, string.len);
+	*kind = table->entries[idx].kind;
 
-    u32 string_idx = (u32)(istring - (Interned_String*)Arena_GetBasePointer(table->string_arena));
-
-    *entry = (Ident_Entry){
-      .hash       = hash,
-      .string_idx = string_idx,
-      .kind       = Token_Ident,
-    };
-
-    table->entry_count += 1;
-    // NOTE: Ensure one spot is vacant at the end of each bucket, this is to avoid overflow into the next bucket
-    ASSERT((idx & ((1ULL << IDENT_TABLE_BUCKET_SIZE_LG2) - 1)) < (1ULL << IDENT_TABLE_BUCKET_SIZE_LG2) - 2);
-  }
-
-  *kind = entry->kind;
-  return (Ident)idx;
+	return (Ident)idx;
 }
 
-#endif
-
-static Ident_Table*
-IdentTable_Create(umm string_reserve_size)
+Ident_Table*
+IdentTable_Init(Arena* arena, Arena* string_arena)
 {
-  Ident_Table* table = ReserveMemory(sizeof(Ident_Table), true);
-  table->string_arena = Arena_Create(string_reserve_size);
-  table->entry_count  = 0;
-  
-  for (umm i = 0; i < ARRAY_SIZE(Token_KeywordStrings); ++i)
-  {
-    Ident ident = IdentTable_Put(table, Token_KeywordStrings[i], &(Token_Kind){0});
-    table->entries[ident].kind = (u16)(Token__FirstKeyword + i);
-  }
+	Ident_Table* table = Arena_Push(arena, sizeof(Ident_Table), ALIGNOF(Ident_Table));
+	*table = (Ident_Table){
+		.string_arena = string_arena,
+		.strings      = Arena_Push(string_arena, 0, ALIGNOF(Interned_String)),
+		.entries      = {0},
+	};
 
-  Ident blank_ident = IdentTable_Put(table, STRING("_"), &(Token_Kind){0});
-  table->entries[blank_ident].kind = Token_Blank;
+	table->entries[IdentTable_Put(table, IdentTable_Hash(STRING("_")), STRING("_"), &(Token_Kind){0})].kind = Token_Blank;
 
-  return table;
-}
+	for (umm i = 0; i < ARRAY_SIZE(Token_KeywordStrings); ++i)
+	{
+		String s = Token_KeywordStrings[i];
+		table->entries[IdentTable_Put(table, IdentTable_Hash(s), s, &(Token_Kind){0})].kind = Token__FirstKeyword + i;
+	}
 
-static void
-IdentTable_Destroy(Ident_Table** table)
-{
-  Arena_Destroy(&(*table)->string_arena);
-  ReleaseMemory(*table);
-  *table = 0;
+	return table;
 }

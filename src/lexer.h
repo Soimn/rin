@@ -266,11 +266,11 @@ Lexer_NextToken(Lexer* lexer)
 
           String ident_string = {
             .data = start_of_token,
-            .len  = lexer->cursor - start_of_token,
+            .len  = (u32)(lexer->cursor - start_of_token),
           };
 
           Token_Kind kind;
-          Ident ident = IdentTable_Put(lexer->ident_table, ident_string, &kind);
+          Ident ident = IdentTable_Put(lexer->ident_table, IdentTable_Hash(ident_string), ident_string, &kind);
 
           token.kind  = kind;
           token.ident = ident;

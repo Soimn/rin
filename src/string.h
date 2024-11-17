@@ -1,7 +1,7 @@
 typedef struct String
 {
   u8* data;
-  u64 len;
+  u32 len;
 } String;
 
 #define STRING(S) (String){ .data = (S), .len = sizeof(S)-1 }

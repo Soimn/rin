@@ -38,11 +38,20 @@ typedef u8 bool;
 typedef float f32;
 typedef double f64;
 
-#define ASSERT(EX) ((EX) ? 1 : (__debugbreak(), *(volatile int*)0 = 0))
+#ifdef _WIN32
+#define IS_DEBUGGER_PRESENT() IsDebuggerPresent()
+#else
+#define IS_DEBUGGER_PRESENT() false
+#endif
+
+void AssertHandler(char* file, int line, char* expr);
+#define ASSERT(EX) ((EX) ? 1 : (IS_DEBUGGER_PRESENT() ? *(volatile int*)0 = 0 : AssertHandler(__FILE__, __LINE__, #EX)))
 #define NOT_IMPLEMENTED ASSERT(!"NOT_IMPLEMENTED")
 #define UNREACHABLE ASSERT(!"UNREACHABLE")
 
 #define ARRAY_SIZE(A) (sizeof(A)/sizeof(0[A]))
+
+#define ALIGNOF(T) _alignof(T)
 
 typedef union F32_Bits
 {
