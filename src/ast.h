@@ -195,7 +195,7 @@ typedef struct AST_Proc_Lit_Expr
   AST_HEADER;
   AST* params;
   AST* ret_types;
-  AST* body;
+  AST* body; // NOTE: if body is 0 this is a forward decl
 } AST_Proc_Lit_Expr;
 
 typedef struct AST_Struct_Type_Expr

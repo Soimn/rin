@@ -300,6 +300,15 @@ Parser__ParsePrimaryExpression(Parser* state, AST** expr)
 
       *expr = &proc_lit->header;
     }
+		else if (EAT_TOKEN(Token_StrikeOut))
+		{
+      AST_Proc_Lit_Expr* proc_lit = PUSH_EXPR(AST_Proc_Lit_Expr, AST_ProcLit);
+      proc_lit->params    = params;
+      proc_lit->ret_types = ret_types;
+      proc_lit->body      = 0;
+
+      *expr = &proc_lit->header;
+		}
     else
     {
       AST_Proc_Type_Expr* proc_type = PUSH_EXPR(AST_Proc_Type_Expr, AST_ProcType);
@@ -661,7 +670,6 @@ Parser__ParseStatement(Parser* state, bool check_for_semi, AST** stmnt)
     if      ((*stmnt)->kind == AST_Block) ((AST_Block_Stmnt*)*stmnt)->label = label;
     else if ((*stmnt)->kind == AST_If)    ((AST_If_Stmnt*)*stmnt)->label    = label;
     else if ((*stmnt)->kind == AST_While) ((AST_While_Stmnt*)*stmnt)->label = label;
-    else UNREACHABLE;
   }
   else if (GET_TOKEN().kind == Token_OpenBrace)
   {
@@ -901,7 +909,7 @@ Parser__ParseBlock(Parser* state, AST** stmnt)
 }
 
 static bool
-Parser_ParseFile(Arena* ast_arena, Ident_Table* ident_table, u8* file_contents, AST** ast, u64* debug_lines)
+Parser_ParseFile(Arena* ast_arena, Ident_Table* ident_table, u8* file_contents, AST** ast)
 {
   Parser _parser = {
     .ast_arena = ast_arena,
@@ -945,8 +953,6 @@ Parser_ParseFile(Arena* ast_arena, Ident_Table* ident_table, u8* file_contents, 
 
     next_stmnt = &(*next_stmnt)->next;
   }
-
-  *debug_lines = GET_TOKEN().line;
 
   return true;
 }

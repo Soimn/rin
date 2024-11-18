@@ -94,6 +94,7 @@ typedef enum Token_Kind
   Token_CloseBrace,                                       // }
 
   Token_Arrow,                                            // ->
+	Token_StrikeOut,                                        // ---
 
   Token_Dot,                                              // .
   Token_DotParen,                                         // .(

@@ -23,8 +23,6 @@ FNV1A(String string)
 #define IDENT_TABLE_SIZE_LG2 23
 #define IDENT_TABLE_MASK ((1ULL << IDENT_TABLE_SIZE_LG2) - 1)
 
-typedef u32 Ident;
-
 typedef struct Interned_String
 {
 	u32 len;

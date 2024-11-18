@@ -47,7 +47,6 @@ typedef double f64;
 void AssertHandler(char* file, int line, char* expr);
 #define ASSERT(EX) ((EX) ? 1 : (IS_DEBUGGER_PRESENT() ? *(volatile int*)0 = 0 : AssertHandler(__FILE__, __LINE__, #EX)))
 #define NOT_IMPLEMENTED ASSERT(!"NOT_IMPLEMENTED")
-#define UNREACHABLE ASSERT(!"UNREACHABLE")
 
 #define ARRAY_SIZE(A) (sizeof(A)/sizeof(0[A]))
 
@@ -70,6 +69,15 @@ typedef u32 Ident;
 static void* ReserveMemory(umm size, bool do_commit);
 static void CommitMemory(void* base, umm size);
 static void ReleaseMemory(void* reserve_base);
+
+typedef struct Entity
+{
+	// file
+	// dependencies?
+	// symbol table?
+	// constant stack?
+	struct AST* ast;
+} Entity;
 
 #include "memory.h"
 #include "string.h"

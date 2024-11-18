@@ -116,6 +116,11 @@ Lexer_NextToken(Lexer* lexer)
           token.kind     = Token_Arrow;
           lexer->cursor += 1;
         }
+				else if (lexer->cursor[0] == '-' && lexer->cursor[1] == '-')
+				{
+					token.kind     = Token_StrikeOut;
+					lexer->cursor += 2;
+				}
         else
         {
           token.kind     = Token_Sub | c1_eq_bit;
