@@ -64,6 +64,10 @@ typedef union F64_Bits
   f64 f;
 } F64_Bits;
 
+void* ReserveMemory(umm size);
+void CommitMemory(void* base, umm size);
+void ReleaseMemory(void* base);
+
 #include "memory.h"
 #include "string.h"
 #include "ident.h"
