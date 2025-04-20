@@ -45,7 +45,7 @@ typedef double f64;
 #endif
 
 void AssertHandler(char* file, int line, char* expr);
-#define ASSERT(EX) ((EX) ? 1 : (IS_DEBUGGER_PRESENT() ? *(volatile int*)0 = 0 : AssertHandler(__FILE__, __LINE__, #EX)))
+#define ASSERT(EX) ((EX) ? 1 : (IS_DEBUGGER_PRESENT() ? *(volatile int*)0 = 0 : (AssertHandler(__FILE__, __LINE__, #EX), 0)))
 #define NOT_IMPLEMENTED ASSERT(!"NOT_IMPLEMENTED")
 
 #define ARRAY_LEN(A) (sizeof(A)/sizeof(0[A]))
@@ -73,5 +73,6 @@ void ReleaseMemory(void* base);
 #include "ident.h"
 #include "tokens.h"
 #include "ast.h"
+#include "types.h"
 #include "lexer.h"
 #include "parser.h"

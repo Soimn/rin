@@ -4,8 +4,8 @@ typedef struct String
   u32 len;
 } String;
 
-#define STRING(S) (String){ .data = (S), .len = sizeof(S)-1 }
-#define MS_STRING(S) { .data = (S), .len = sizeof(S)-1 }
+#define STRING(S) (String){ .data = (u8*(u8*))(S), .len = sizeof(S)-1 }
+#define MS_STRING(S) { .data = (u8*)(S), .len = sizeof(S)-1 }
 
 static bool
 Char_IsAlpha(u8 c)

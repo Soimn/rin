@@ -1,0 +1,4 @@
+main :: proc() -> int
+{
+	return 0;
+}

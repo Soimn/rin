@@ -562,6 +562,7 @@ Parser__ParseBinaryExpression(Parser* state, AST** expr)
 	{
 		AST_Kind op    = GET_TOKEN().kind;
 		u32 precedence = AST_KIND__BLOCK_IDX(op);
+		NEXT_TOKEN();
 
 		while (precedence >= stack[stack_cur-1].precedence) --stack_cur;
 

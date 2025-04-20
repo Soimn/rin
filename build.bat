@@ -12,7 +12,7 @@ if "%Platform%" neq "x64" (
 	goto end
 )
 
-set "common_compile_options= /nologo /W3"
+set "common_compile_options= /nologo /W4 /wd4201"
 set "common_link_options= /incremental:no /opt:ref /subsystem:console"
 
 if "%1"=="debug" (
