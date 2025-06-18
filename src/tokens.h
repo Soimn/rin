@@ -123,3 +123,11 @@ String Keyword_While    = STRING("while");
 String Keyword_Break    = STRING("break");
 String Keyword_Continue = STRING("continue");
 String Keyword_Return   = STRING("return");
+
+typedef struct Token_Array
+{
+	Token* tokens;
+	u32 offset;
+	u32 committed;
+	u32 reserved;
+} Token_Array;

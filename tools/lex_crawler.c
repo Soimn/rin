@@ -19,6 +19,9 @@ typedef u8 bool;
 #define true 1
 #define false 0
 
+#define MIN(A, B) ((A) < (B) ? (A) : (B))
+#define MAX(A, B) ((A) > (B) ? (A) : (B))
+
 u32
 StrCopy(wchar_t* dst, wchar_t* src)
 {
@@ -65,7 +68,70 @@ typedef struct Stats
 	u64 idents;
 	u64 strings;
 	u64 keywords;
+	u64 whitespace;
+	u64 ws_min;
+	u64 ws_max;
+	u64 ws_sum;
+	u64 ident_min;
+	u64 ident_max;
+	u64 ident_sum;
+	u64 string_min;
+	u64 string_max;
+	u64 string_sum;
+	u64 misc;
+	u64 misc_sum;
+	u64 comments;
+	u64 comment_sum;
+	u64 preprocs;
+	u64 preproc_sum;
 } Stats;
+
+u8*
+SkipSingleComment(u8* scan, Stats* stats)
+{
+	assert(scan[0] == '/' && scan[1] == '/');
+
+	u8* start = scan;
+
+	while (*scan != 0 && *scan != '\n')
+	{
+		if (scan[0] == '\\' && scan[1] == '\r' && scan[2] == '\n')
+		{
+			++stats->lines;
+			scan += 3;
+		}
+		else ++scan;
+	}
+
+	++stats->comments;
+	stats->comment_sum += scan - start;
+
+	return scan;
+}
+
+u8*
+SkipBlockComment(u8* scan, Stats* stats)
+{
+	assert(scan[0] == '/' && scan[1] == '*');
+
+	u8* start = scan;
+
+	scan += 2;
+
+	while (*scan != 0 && !(scan[0] == '*' && scan[1] == '/'))
+	{
+		if (*scan == '\n') ++stats->lines;
+		++scan;
+	}
+
+	assert(scan[0] == '*' && scan[1] == '/');
+	scan += 2;
+
+	++stats->comments;
+	stats->comment_sum += scan - start;
+
+	return scan;
+}
 
 void
 GatherStats(Stats* stats, u8* buffer)
@@ -75,34 +141,39 @@ GatherStats(Stats* stats, u8* buffer)
 	u8* scan = buffer;
 	for (;;)
 	{
-		while (*scan != 0 && (*scan == ' ' || *scan == '\t' || *scan == '\r')) ++scan;
-
-		if (*scan == 0) break;
-		else if (*scan == '\n')
 		{
-			++stats->lines;
-			++scan;
-		}
-		else if (scan[0] == '/' && scan[1] == '/')
-		{
-			while (*scan != 0 && *scan != '\n') ++scan;
-		}
-		else if (scan[0] == '/' && scan[1] == '*')
-		{
-			scan += 2;
-
-			while (*scan != 0 && (scan[0] != '*' || scan[1] != '/'))
+			u8* ws_start = scan;
+			for (;;)
 			{
-				if (*scan == '\n') ++stats->lines;
-				++scan;
+				if (*scan == ' ' || *scan == '\t' || *scan == '\r' || *scan == '\v' || *scan == '\f')
+				{
+					++scan;
+				}
+				else if (*scan == '\n' || scan[0] == '\\' && scan[1] == '\r' && scan[2] == '\n')
+				{
+					++stats->lines;
+
+					scan += (*scan == '\\' ? 3 : 1);
+				}
+				else break;
 			}
 
-			if (*scan != 0) scan += 2;
+			u64 ws_len = scan - ws_start;
+			stats->ws_sum += ws_len;
+			stats->ws_min = MIN(stats->ws_min, ws_len);
+			stats->ws_max = MAX(stats->ws_max, ws_len);
+			++stats->whitespace;
 		}
+
+		if (*scan == 0) break;
+		else if (scan[0] == '/' && scan[1] == '/') scan = SkipSingleComment(scan, stats);
+		else if (scan[0] == '/' && scan[1] == '*') scan = SkipBlockComment(scan, stats);
 		else if (Char_IsAlpha(*scan) || *scan == '_')
 		{
 			u8* ident = scan;
 			while (Char_IsAlpha(*scan) || Char_IsDigit(*scan) || *scan == '_') ++scan;
+
+			assert(!(scan[0] == '\\' && scan[1] == '\r' && scan[2] == '\n' && (Char_IsAlpha(scan[3]) || Char_IsDigit(scan[3]) || scan[3] == '_')));
 
 			++stats->tokens;
 			++stats->idents;
@@ -144,66 +215,200 @@ GatherStats(Stats* stats, u8* buffer)
 					break;
 				}
 			}
+
+			u64 ident_len = scan - ident;
+			stats->ident_sum += ident_len;
+			stats->ident_min = MIN(stats->ident_min, ident_len);
+			stats->ident_max = MAX(stats->ident_max, ident_len);
 		}
-		else if (Char_IsDigit(*scan))
+		else if (Char_IsDigit(*scan) || *scan == '.')
 		{
-			while (Char_IsDigit(*scan)) ++scan;
+			if (scan[0] == '0' && (scan[1]&0xDF) == 'X')
+			{
+				scan += 2;
+
+				while (Char_IsDigit(*scan) || (u8)((*scan&0xDF) - 'A') <= (u8)('F' - 'A')) ++scan;
+
+				if (*scan == '.')
+				{
+					++scan;
+					while (Char_IsDigit(*scan) || (u8)((*scan&0xDF) - 'A') <= (u8)('F' - 'A')) ++scan;
+
+					if ((*scan&0xDF) == 'P')
+					{
+						++scan;
+						if (*scan == '+' || *scan == '-') ++scan;
+						while (Char_IsDigit(*scan)) ++scan;
+					}
+				}
+			}
+			else if (scan[0] == '.' && !Char_IsDigit(scan[1]))
+			{
+				++scan;
+			}
+			else
+			{
+				while (Char_IsDigit(*scan)) ++scan;
+
+				if (*scan == '.')
+				{
+					++scan;
+					while (Char_IsDigit(*scan)) ++scan;
+
+					if ((*scan&0xDF) == 'E')
+					{
+						++scan;
+						if (*scan == '+' || *scan == '-') ++scan;
+						while (Char_IsDigit(*scan)) ++scan;
+					}
+				}
+			}
+
+			u8 u = *scan & 0xDF;
+			if      (u == 'U' && (scan[1]&0xDF) == 'L') scan += ((scan[2]&0xDF) == 'L' ? 3 : 2);
+			else if (u == 'L')                          scan += ((scan[1]&0xDF) == 'L' ? 2 : 1);
+			else if (u == 'F' || u == 'U')              scan += 1;
+
 			++stats->tokens;
 		}
 		else if (*scan == '"')
 		{
-			++scan;
+			u8* string = scan;
 
-			while (*scan != 0 && *scan != '"')
+			++scan;
+			
+			while (*scan != '"')
 			{
-				if (scan[0] == '\\' && scan[1] != 0) ++scan;
-				++scan;
+				assert(*scan != 0);
+				if (scan[0] == '\\' && (scan[1] == '"' || scan[1] == '\\'))
+				{
+					scan += 2;
+				}
+				else if (scan[0] == '\\' && scan[1] == '\r' && scan[2] == '\n')
+				{
+					++stats->lines;
+					scan += 3;
+				}
+				else ++scan;
 			}
 
-			assert(*scan != 0);
 			++scan;
 
-			++stats->strings;
 			++stats->tokens;
+			++stats->strings;
+
+			u64 string_len = scan - string;
+			stats->string_sum += string_len;
+			stats->string_min = MIN(stats->string_min, string_len);
+			stats->string_max = MAX(stats->string_max, string_len);
 		}
 		else if (*scan == '\'')
 		{
 			++scan;
-
-			while (*scan != 0 && *scan != '\'')
+			
+			while (*scan != '\'')
 			{
-				if (scan[0] == '\\' && scan[1] != 0) ++scan;
-				++scan;
-			}
-
-			assert(*scan != 0);
-			++scan;
-
-			++stats->tokens;
-		}
-		else if (*scan == '#')
-		{
-			while (*scan != 0 && *scan != '\n')
-			{
-				if (scan[0] == '/' && scan[1] == '*')
-				{
-					break;
-				}
-				else if (scan[0] == '\\' && scan[1] == '\r' && scan[2] == '\n')
+				assert(*scan != 0);
+				if (scan[0] == '\\' && (scan[1] == '\'' || scan[1] == '\\'))
 				{
 					scan += 2;
 				}
-				++scan;
+				else if (scan[0] == '\\' && scan[1] == '\r' && scan[2] == '\n')
+				{
+					assert(false);
+				}
+				else ++scan;
 			}
+
+			++scan;
+
+			++stats->tokens;
 		}
+		/*
+		else if (*scan == '#')
+		{
+			u8* start = scan;
+
+			for (;;)
+			{
+				u8* ws_start = scan;
+				for (;;)
+				{
+					if (*scan == ' ' || *scan == '\t' || *scan == '\r' || *scan == '\v' || *scan == '\f')
+					{
+						++scan;
+					}
+					else if (scan[0] == '\\' && scan[1] == '\r' && scan[2] == '\n')
+					{
+						++stats->lines;
+						scan += 3;
+					}
+					else break;
+				}
+
+				u64 ws_len = scan - ws_start;
+				if (*scan == '\n') ++ws_len;
+				stats->ws_sum += ws_len;
+				stats->ws_min = MIN(stats->ws_min, ws_len);
+				stats->ws_max = MAX(stats->ws_max, ws_len);
+				++stats->whitespace;
+
+				if (*scan == '\n')
+				{
+					++stats->lines;
+					++scan;
+					break;
+				}
+				else if (scan[0] == '/' && scan[1] == '/')
+				{
+					scan = SkipSingleComment(scan, stats);
+					break;
+				}
+				else if (scan[0] == '/' && scan[1] == '*')
+				{
+					scan = SkipBlockComment(scan, stats);
+				}
+				else
+				{
+					if (*scan == 0) break;
+					++scan;
+				}
+			}
+
+			++stats->preprocs;
+			stats->preproc_sum += scan - start;
+		}
+		*/
 		else
 		{
+			u8* start = scan;
+
+			if (scan[0] == scan[1] && (*scan == '+' || *scan == '-' || *scan == '&' || *scan == '|' || *scan == '<' || *scan == '>'))
+			{
+				scan += 2;
+			}
+			else if (scan[0] != 0 && scan[1] == '=' && (*scan == '=' || *scan == '!' || *scan == '<' || *scan == '>' ||
+						                                      *scan == '*' || *scan == '/' || *scan == '%' || *scan == '&' ||
+																									*scan == '+' || *scan == '-' || *scan == '|' || *scan == '^'))
+			{
+				scan += 2;
+			}
+			else if ((*scan == '<' || *scan == '>') && scan[0] == scan[1] && scan[2] == '=')
+			{
+				scan += 3;
+			}
+			else
+			{
+				++scan;
+			}
+
 			++stats->tokens;
-			++scan;
+			++stats->misc;
+			stats->misc_sum += scan - start;
 		}
 	}
 
-	stats->bytes += (scan - buffer);
+	stats->bytes += scan - buffer;
 }
 
 void
@@ -258,6 +463,8 @@ Crawl(wchar_t* filename, u32 filename_len, Stats* stats, u8* buffer)
 
 				filename[filename_len] = 0;
 
+				//if (StrMatch(find_data.cFileName, L"speakup_dtlk.h")) __debugbreak();
+
 				GatherStats(stats, buffer);
 			}
 		}
@@ -297,9 +504,23 @@ wmain(int argc, wchar_t** argv)
 	}
 
 	Stats stats = {0};
+	stats.ident_min  = ~0ULL;
+	stats.string_min = ~0ULL;
+	stats.ws_min     = ~0ULL;
 	Crawl(filename, filename_len, &stats, buffer);
 
-	printf("Stats:\nfiles: %llu\nlines: %llu\nbytes: %llu\ntokens: %llu\nidents: %llu\nstrings: %llu\nkeywords: %llu\n", stats.files, stats.lines, stats.bytes, stats.tokens, stats.idents, stats.strings, stats.keywords);
+	printf("Stats:\n");
+	printf("files:      % 10llu\n", stats.files);
+	printf("bytes:      % 10llu B (%f MB)\n", stats.bytes, (double)stats.bytes/(1 << 20));
+	printf("lines:      % 10llu\n", stats.lines);
+	printf("tokens:     % 10llu\n", stats.tokens);
+	printf("keywords:   % 10llu\n", stats.keywords);
+	printf("idents:     % 10llu (sum: % 9llu B (%5.2f%%), min: %llu, max: % 5llu, avg: %9.6f)\n", stats.idents, stats.ident_sum, 100*(double)stats.ident_sum/stats.bytes, stats.ident_min, stats.ident_max, (double)stats.ident_sum/stats.idents);
+	printf("strings:    % 10llu (sum: % 9llu B (%5.2f%%), min: %llu, max: % 5llu, avg: %9.6f)\n", stats.strings, stats.string_sum, 100*(double)stats.string_sum/stats.bytes, stats.string_min, stats.string_max, (double)stats.string_sum/stats.strings);
+	printf("whitespace: % 10llu (sum: % 9llu B (%5.2f%%), min: %llu, max: % 5llu, avg: %9.6f)\n", stats.whitespace, stats.ws_sum, 100*(double)stats.ws_sum/stats.bytes, stats.ws_min, stats.ws_max, (double)stats.ws_sum/stats.whitespace);
+	printf("comments:   % 10llu (sum: % 9llu B (%5.2f%%))\n", stats.comments, stats.comment_sum, 100*(double)stats.comment_sum/stats.bytes);
+	//printf("preproc:    % 10llu (sum: % 9llu B (%5.2f%%))\n", stats.preprocs, stats.preproc_sum, 100*(double)stats.preproc_sum/stats.bytes);
+	printf("misc:       % 10llu (sum: % 9llu B (%5.2f%%))\n", stats.misc, stats.misc_sum, 100*(double)stats.misc_sum/stats.bytes);
 
 	return 0;
 }

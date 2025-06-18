@@ -1,3 +1,12 @@
+// NOTE: Constraints
+// max total file size: 4GB
+// linux like source code qualities:
+// - 40% of tokens are identifiers
+// - 0.0968 tokens per byte / 10.33 bytes per token
+// - 15.7% of identifiers are keywords
+// offset/line/col are rarely used and can be recomputed on demand
+// tab, space, carriage return and line feed are the only valid whitespace characters, everything else is an error
+
 #include <stdio.h>
 #include <stdint.h>
 
@@ -40,6 +49,15 @@ String_Match(String a, String b)
 }
 
 #include "tokens.h"
+
+typedef struct Source_File
+{
+	// TODO: id
+	u8* contents;
+	Token* tokens;
+	u32 tokens_len;
+} Source_File;
+
 #include "lexer.h"
 
 int
