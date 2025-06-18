@@ -20,16 +20,6 @@ typedef u8 bool;
 #define false 0
 
 u32
-Strlen(wchar_t* s)
-{
-	u32 i = 0;
-
-	while (s[i] != 0) ++i;
-
-	return i;
-}
-
-u32
 StrCopy(wchar_t* dst, wchar_t* src)
 {
 	u32 i = 0;
@@ -68,16 +58,20 @@ Char_IsDigit(u8 c)
 
 typedef struct Stats
 {
+	u64 files;
 	u64 lines;
-	u64 tokens;
 	u64 bytes;
+	u64 tokens;
 	u64 idents;
+	u64 strings;
 	u64 keywords;
 } Stats;
 
 void
 GatherStats(Stats* stats, u8* buffer)
 {
+	++stats->files;
+
 	u8* scan = buffer;
 	for (;;)
 	{
@@ -112,7 +106,7 @@ GatherStats(Stats* stats, u8* buffer)
 
 			++stats->tokens;
 			++stats->idents;
-/*
+
 			char* keywords[] = {
 				"if",
 				"for",
@@ -150,16 +144,57 @@ GatherStats(Stats* stats, u8* buffer)
 					break;
 				}
 			}
-			*/
 		}
 		else if (Char_IsDigit(*scan))
 		{
 			while (Char_IsDigit(*scan)) ++scan;
 			++stats->tokens;
 		}
+		else if (*scan == '"')
+		{
+			++scan;
+
+			while (*scan != 0 && *scan != '"')
+			{
+				if (scan[0] == '\\' && scan[1] != 0) ++scan;
+				++scan;
+			}
+
+			assert(*scan != 0);
+			++scan;
+
+			++stats->strings;
+			++stats->tokens;
+		}
+		else if (*scan == '\'')
+		{
+			++scan;
+
+			while (*scan != 0 && *scan != '\'')
+			{
+				if (scan[0] == '\\' && scan[1] != 0) ++scan;
+				++scan;
+			}
+
+			assert(*scan != 0);
+			++scan;
+
+			++stats->tokens;
+		}
 		else if (*scan == '#')
 		{
-			while (*scan != 0 && *scan != '\n') ++scan;
+			while (*scan != 0 && *scan != '\n')
+			{
+				if (scan[0] == '/' && scan[1] == '*')
+				{
+					break;
+				}
+				else if (scan[0] == '\\' && scan[1] == '\r' && scan[2] == '\n')
+				{
+					scan += 2;
+				}
+				++scan;
+			}
 		}
 		else
 		{
@@ -264,7 +299,7 @@ wmain(int argc, wchar_t** argv)
 	Stats stats = {0};
 	Crawl(filename, filename_len, &stats, buffer);
 
-	printf("Total stats:\nlines: %llu\ntokens: %llu\nidents: %llu\nbytes: %llu\nkeywords: %llu\n", stats.lines, stats.tokens, stats.idents, stats.bytes, stats.keywords);
+	printf("Stats:\nfiles: %llu\nlines: %llu\nbytes: %llu\ntokens: %llu\nidents: %llu\nstrings: %llu\nkeywords: %llu\n", stats.files, stats.lines, stats.bytes, stats.tokens, stats.idents, stats.strings, stats.keywords);
 
 	return 0;
 }
