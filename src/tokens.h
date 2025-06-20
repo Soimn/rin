@@ -72,6 +72,8 @@ typedef enum Token_Kind
 	Token__PastLastBinaryAssignment,
 
 	Token_Bang,                                      // !
+	Token_At,                                        // @
+	Token_Pound,                                     // #
 	Token_Cash,                                      // $
 	Token_QMark,                                     // ?
 	Token_Colon,                                     // :
@@ -93,9 +95,9 @@ typedef enum Token_Kind
 	Token_DotBracket,                                // .[
 	Token_DotBrace,                                  // .{
 
-	Token_Blank,                                     // _
 	Token_Ident,
 	Token_String,
+	Token_Char,
 	Token_Int,
 	Token_Float,
 } Token_Kind;
@@ -103,8 +105,8 @@ typedef enum Token_Kind
 typedef struct Token
 {
 	u16 kind;
-	u16 relative_offset;
-	u32 len;
+	u16 _;
+	u32 len; // string and ident len
 	union
 	{
 		u8* data;
@@ -113,21 +115,13 @@ typedef struct Token
 	};
 } Token;
 
-String Keyword_True     = STRING("true");
-String Keyword_False    = STRING("false");
-String Keyword_Proc     = STRING("proc");
-String Keyword_Struct   = STRING("struct");
-String Keyword_If       = STRING("if");
-String Keyword_Else     = STRING("else");
-String Keyword_While    = STRING("while");
-String Keyword_Break    = STRING("break");
-String Keyword_Continue = STRING("continue");
-String Keyword_Return   = STRING("return");
-
-typedef struct Token_Array
-{
-	Token* tokens;
-	u32 offset;
-	u32 committed;
-	u32 reserved;
-} Token_Array;
+String Keyword_True     = MS_STRING("true");
+String Keyword_False    = MS_STRING("false");
+String Keyword_Proc     = MS_STRING("proc");
+String Keyword_Struct   = MS_STRING("struct");
+String Keyword_If       = MS_STRING("if");
+String Keyword_Else     = MS_STRING("else");
+String Keyword_While    = MS_STRING("while");
+String Keyword_Break    = MS_STRING("break");
+String Keyword_Continue = MS_STRING("continue");
+String Keyword_Return   = MS_STRING("return");

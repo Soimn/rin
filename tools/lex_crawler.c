@@ -412,6 +412,265 @@ GatherStats(Stats* stats, u8* buffer)
 }
 
 void
+GatherStatsOdin(Stats* stats, u8* buffer)
+{
+	++stats->files;
+
+	u8* scan = buffer;
+	for (;;)
+	{
+		{
+			u8* ws_start = scan;
+			for (;;)
+			{
+				if (*scan == ' ' || *scan == '\t' || *scan == '\r' || *scan == '\v' || *scan == '\f')
+				{
+					++scan;
+				}
+				else if (*scan == '\n' || scan[0] == '\\' && scan[1] == '\r' && scan[2] == '\n')
+				{
+					++stats->lines;
+
+					scan += (*scan == '\\' ? 3 : 1);
+				}
+				else break;
+			}
+
+			u64 ws_len = scan - ws_start;
+			stats->ws_sum += ws_len;
+			stats->ws_min = MIN(stats->ws_min, ws_len);
+			stats->ws_max = MAX(stats->ws_max, ws_len);
+			++stats->whitespace;
+		}
+
+		if (*scan == 0) break;
+		else if (scan[0] == '/' && scan[1] == '/') scan = SkipSingleComment(scan, stats);
+		else if (scan[0] == '/' && scan[1] == '*')
+		{
+			u64 nesting = 1;
+			scan += 2;
+
+			while (nesting > 0)
+			{
+				if (scan[0] == '/' && scan[1] == '*')
+				{
+					++nesting;
+					scan += 2;
+				}
+				else if (scan[0] == '*' && scan[1] == '/')
+				{
+					--nesting;
+					scan += 2;
+				}
+				else ++scan;
+			}
+		}
+		else if (Char_IsAlpha(*scan) || *scan == '_')
+		{
+			u8* ident = scan;
+			while (Char_IsAlpha(*scan) || Char_IsDigit(*scan) || *scan == '_') ++scan;
+
+			assert(!(scan[0] == '\\' && scan[1] == '\r' && scan[2] == '\n' && (Char_IsAlpha(scan[3]) || Char_IsDigit(scan[3]) || scan[3] == '_')));
+
+			++stats->tokens;
+			++stats->idents;
+
+			char* keywords[] = {
+				"asm",
+				"auto_cast",
+				"bit_field",
+				"bit_set",
+				"break",
+				"case",
+				"cast",
+				"context",
+				"continue",
+				"defer",
+				"distinct",
+				"do",
+				"dynamic",
+				"else",
+				"enum",
+				"fallthrough",
+				"for",
+				"foreign",
+				"if",
+				"import",
+				"in",
+				"map",
+				"not_in",
+				"or_else",
+				"or_return",
+				"package",
+				"proc",
+				"return",
+				"struct",
+				"switch",
+				"transmute",
+				"typeid",
+				"union",
+				"using",
+				"when",
+				"where",
+			};
+
+			for (int i = 0; i < sizeof(keywords)/sizeof(keywords[0]); ++i)
+			{
+				if (strncmp((char*)ident, keywords[i], scan - ident) == 0 && keywords[i][scan - ident] == 0)
+				{
+					++stats->keywords;
+					break;
+				}
+			}
+
+			u64 ident_len = scan - ident;
+			stats->ident_sum += ident_len;
+			stats->ident_min = MIN(stats->ident_min, ident_len);
+			stats->ident_max = MAX(stats->ident_max, ident_len);
+		}
+		else if (Char_IsDigit(*scan) || *scan == '.')
+		{
+			if (scan[0] == '0' && (scan[1]&0xDF) == 'X')
+			{
+				scan += 2;
+
+				while (Char_IsDigit(*scan) || (u8)((*scan&0xDF) - 'A') <= (u8)('F' - 'A') || *scan == '_') ++scan;
+			}
+			else if (scan[0] == '0' && (scan[1]&0xDF) == 'O' ||  (scan[1]&0xDF) == 'B' ||  (scan[1]&0xDF) == 'D')
+			{
+				scan += 2;
+
+				while (Char_IsDigit(*scan) || *scan == '_') ++scan;
+			}
+			else if (scan[0] == '.' && !Char_IsDigit(scan[1]))
+			{
+				++scan;
+			}
+			else
+			{
+				while (Char_IsDigit(*scan)) ++scan;
+
+				if (*scan == '.')
+				{
+					++scan;
+					while (Char_IsDigit(*scan)) ++scan;
+
+					if ((*scan&0xDF) == 'E')
+					{
+						++scan;
+						if (*scan == '+' || *scan == '-') ++scan;
+						while (Char_IsDigit(*scan)) ++scan;
+					}
+				}
+			}
+
+			++stats->tokens;
+		}
+		else if (*scan == '"')
+		{
+			u8* string = scan;
+
+			++scan;
+			
+			while (*scan != '"')
+			{
+				assert(*scan != 0);
+				if (scan[0] == '\\' && (scan[1] == '"' || scan[1] == '\\'))
+				{
+					scan += 2;
+				}
+				else if (scan[0] == '\\' && scan[1] == '\r' && scan[2] == '\n')
+				{
+					++stats->lines;
+					scan += 3;
+				}
+				else ++scan;
+			}
+
+			++scan;
+
+			++stats->tokens;
+			++stats->strings;
+
+			u64 string_len = scan - string;
+			stats->string_sum += string_len;
+			stats->string_min = MIN(stats->string_min, string_len);
+			stats->string_max = MAX(stats->string_max, string_len);
+		}
+		else if (*scan == '`')
+		{
+			u8* string = scan;
+
+			++scan;
+			
+			while (*scan != 0 && *scan != '`') ++scan;
+			
+			assert(*scan != 0);
+			++scan;
+
+			++stats->tokens;
+			++stats->strings;
+
+			u64 string_len = scan - string;
+			stats->string_sum += string_len;
+			stats->string_min = MIN(stats->string_min, string_len);
+			stats->string_max = MAX(stats->string_max, string_len);
+		}
+		else if (*scan == '\'')
+		{
+			++scan;
+			
+			while (*scan != '\'')
+			{
+				assert(*scan != 0);
+				if (scan[0] == '\\' && (scan[1] == '\'' || scan[1] == '\\'))
+				{
+					scan += 2;
+				}
+				else if (scan[0] == '\\' && scan[1] == '\r' && scan[2] == '\n')
+				{
+					assert(false);
+				}
+				else ++scan;
+			}
+
+			++scan;
+
+			++stats->tokens;
+		}
+		else
+		{
+			u8* start = scan;
+
+			if (scan[0] == scan[1] && (*scan == '+' || *scan == '-' || *scan == '&' || *scan == '|' || *scan == '<' || *scan == '>'))
+			{
+				scan += 2;
+			}
+			else if (scan[0] != 0 && scan[1] == '=' && (*scan == '=' || *scan == '!' || *scan == '<' || *scan == '>' ||
+						                                      *scan == '*' || *scan == '/' || *scan == '%' || *scan == '&' ||
+																									*scan == '+' || *scan == '-' || *scan == '|' || *scan == '^'))
+			{
+				scan += 2;
+			}
+			else if ((*scan == '<' || *scan == '>') && scan[0] == scan[1] && scan[2] == '=')
+			{
+				scan += 3;
+			}
+			else
+			{
+				++scan;
+			}
+
+			++stats->tokens;
+			++stats->misc;
+			stats->misc_sum += scan - start;
+		}
+	}
+
+	stats->bytes += scan - buffer;
+}
+
+void
 Crawl(wchar_t* filename, u32 filename_len, Stats* stats, u8* buffer)
 {
 
@@ -447,7 +706,7 @@ Crawl(wchar_t* filename, u32 filename_len, Stats* stats, u8* buffer)
 				if (*scan == '.') ext = scan + 1;
 			}
 
-			if (StrMatch(ext, L"c") || StrMatch(ext, L"cc") || StrMatch(ext, L"cpp") || StrMatch(ext, L"h") || StrMatch(ext, L"hh") || StrMatch(ext, L"hpp"))
+			if (StrMatch(ext, L"c") || StrMatch(ext, L"cc") || StrMatch(ext, L"cpp") || StrMatch(ext, L"h") || StrMatch(ext, L"hh") || StrMatch(ext, L"hpp") || StrMatch(ext, L"odin"))
 			{
 				filename[filename_len] = L'\\';
 				StrCopy(filename + filename_len + 1, &find_data.cFileName[0]);
@@ -463,9 +722,9 @@ Crawl(wchar_t* filename, u32 filename_len, Stats* stats, u8* buffer)
 
 				filename[filename_len] = 0;
 
-				//if (StrMatch(find_data.cFileName, L"speakup_dtlk.h")) __debugbreak();
-
-				GatherStats(stats, buffer);
+				//if (StrMatch(find_data.cFileName, L"reader.odin")) __debugbreak();
+				if (StrMatch(ext, L"odin")) GatherStatsOdin(stats, buffer);
+				else                				GatherStats(stats, buffer);
 			}
 		}
 

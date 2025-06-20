@@ -12,7 +12,8 @@ if "%Platform%" neq "x64" (
 	goto end
 )
 
-set "common_compile_options= /nologo /W4 /arch:AVX2"
+set "ignored_warnings=/wd4201"
+set "common_compile_options= /nologo /W4 %ignored_warnings% /arch:AVX2"
 set "common_link_options= /incremental:no /opt:ref /subsystem:console"
 
 if "%1"=="debug" (
