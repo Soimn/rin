@@ -10,6 +10,48 @@ typedef struct Lexer
 static Token Lexer__ParseNumber(Lexer* lexer);
 static String Lexer__ParseString(Lexer* lexer, u8 terminator);
 
+static struct { u16 kind; u16 mod; } Lexer__LUT[256] = {
+	['!']  = { .kind = Token_Bang,         .mod = 1 },
+	['"']  = { .kind = Token_String,       .mod = 2 },
+	['#']  = { .kind = Token_Pound,        .mod = 0 },
+	['$']  = { .kind = Token_Cash,         .mod = 0 },
+	['%']  = { .kind = Token_Percent,      .mod = 1 },
+	['&']  = { .kind = Token_And,          .mod = 2 },
+	['\''] = { .kind = Token_Char,         .mod = 2 },
+	['(']  = { .kind = Token_OpenParen,    .mod = 0 },
+	[')']  = { .kind = Token_CloseParen,   .mod = 0 },
+	['*']  = { .kind = Token_Star,         .mod = 1 },
+	['+']  = { .kind = Token_Plus,         .mod = 1 },
+	[',']  = { .kind = Token_Comma,        .mod = 0 },
+	['-']  = { .kind = Token_Minus,        .mod = 2 },
+	['.']  = { .kind = Token_Dot,          .mod = 2 },
+	['0']  = { .kind = Token_Int,          .mod = 2 },
+	['1']  = { .kind = Token_Int,          .mod = 2 },
+	['2']  = { .kind = Token_Int,          .mod = 2 },
+	['3']  = { .kind = Token_Int,          .mod = 2 },
+	['4']  = { .kind = Token_Int,          .mod = 2 },
+	['5']  = { .kind = Token_Int,          .mod = 2 },
+	['6']  = { .kind = Token_Int,          .mod = 2 },
+	['7']  = { .kind = Token_Int,          .mod = 2 },
+	['8']  = { .kind = Token_Int,          .mod = 2 },
+	['9']  = { .kind = Token_Int,          .mod = 2 },
+	['/']  = { .kind = Token_Slash,        .mod = 0 },
+	[':']  = { .kind = Token_Colon,        .mod = 0 },
+	[';']  = { .kind = Token_Semicolon,    .mod = 0 },
+	['<']  = { .kind = Token_Le,           .mod = 2 },
+	['=']  = { .kind = Token_Eq,           .mod = 2 },
+	['>']  = { .kind = Token_Ge,           .mod = 2 },
+	['?']  = { .kind = Token_QMark,        .mod = 0 },
+	['@']  = { .kind = Token_At,           .mod = 0 },
+	['[']  = { .kind = Token_OpenBracket,  .mod = 0 },
+	[']']  = { .kind = Token_CloseBracket, .mod = 0 },
+	['^']  = { .kind = Token_Hat,          .mod = 1 },
+	['{']  = { .kind = Token_OpenBrace,    .mod = 0 },
+	['|']  = { .kind = Token_Or,           .mod = 2 },
+	['}']  = { .kind = Token_CloseBrace,   .mod = 0 },
+	['~']  = { .kind = Token_Tilde,        .mod = 1 },
+};
+
 static Token
 Lexer__NextToken(Lexer* lexer)
 {
@@ -19,11 +61,30 @@ Lexer__NextToken(Lexer* lexer)
 	{
 		for (;;)
 		{
-			while (*lexer->cursor == ' ' || *lexer->cursor == '\t' || *lexer->cursor == '\r' || *lexer->cursor == '\f' || *lexer->cursor == '\n') ++lexer->cursor;
-
-			if (*lexer->cursor == 0) break;
-			else if (lexer->cursor[0] == '/' && lexer->cursor[1] == '/')
+#if 0
+			__m256i hex_5f = _mm256_set1_epi8(0x5F);
+			for (;;)
 			{
+				__m256i c = _mm256_loadu_si256((__m256i*)lexer->cursor);
+				int whitespace_mask = _mm256_movemask_epi8(_mm256_cmpgt_epi8(_mm256_add_epi8(c, hex_5f), hex_5f));
+
+				u32 skip;
+				if (_BitScanForward((void*)&skip, whitespace_mask+1) == 0)
+				{
+					lexer->cursor += 32;
+					continue;
+				}
+
+				lexer->cursor += skip;
+				break;
+			}
+#else
+			while ((u8)(*lexer->cursor-1) < (u8)0x20) ++lexer->cursor;
+#endif
+
+			if (lexer->cursor[0] == '/' && lexer->cursor[1] == '/')
+			{
+				lexer->cursor += 2;
 				while (*lexer->cursor != 0 && *lexer->cursor != '\n') ++lexer->cursor;
 			}
 			else if (lexer->cursor[0] == '/' && lexer->cursor[1] == '*')
@@ -61,24 +122,6 @@ Lexer__NextToken(Lexer* lexer)
 		token.len  = (u32)(lexer->cursor - start);
 		token.data = start;
 	}
-	else if (Char_IsDigit(*lexer->cursor))
-	{
-		token = Lexer__ParseNumber(lexer);
-	}
-	else if (*lexer->cursor == '"')
-	{
-		String string = Lexer__ParseString(lexer, '"');
-		token.kind = Token_String;
-		token.len  = string.len;
-		token.data = string.data;
-	}
-	else if (*lexer->cursor == '\'')
-	{
-		String string = Lexer__ParseString(lexer, '\'');
-		token.kind = Token_Char;
-		token.len  = string.len;
-		token.data = string.data;
-	}
 	else if (*lexer->cursor == 0)
 	{
 		token.kind = Token_EOF;
@@ -88,6 +131,179 @@ Lexer__NextToken(Lexer* lexer)
 		u8 c = *lexer->cursor;
 		++lexer->cursor;
 
+		Token_Kind kind = Lexer__LUT[c].kind;
+		u16 mod         = Lexer__LUT[c].mod;
+
+		if (mod == 0)
+		{
+			token.kind = kind;
+			if (kind == Token_Invalid)
+			{
+				//// ERROR: Invalid token
+				NOT_IMPLEMENTED;
+			}
+		}
+		else if (mod == 1)
+		{
+			token.kind = kind;
+			if (*lexer->cursor == '=')
+			{
+				token.kind |= TOKEN_KIND__BINARY_ASS_BIT;
+				++lexer->cursor;
+			}
+		}
+		else
+		{
+			switch (c)
+			{
+				case '=': token.kind = (*lexer->cursor == '=' ? Token_EqEq   : Token_Eq);   lexer->cursor += (*lexer->cursor == '='); break;
+				case '!': token.kind = (*lexer->cursor == '=' ? Token_BangEq : Token_Bang); lexer->cursor += (*lexer->cursor == '='); break;
+
+				case '|':
+				{
+					token.kind = Token_Or;
+					if (*lexer->cursor == '|')
+					{
+						token.kind = Token_OrOr;
+						++lexer->cursor;
+					}
+
+					if (*lexer->cursor == '=')
+					{
+						token.kind |= TOKEN_KIND__BINARY_ASS_BIT;
+						++lexer->cursor;
+					}
+				} break;
+
+				case '&':
+				{
+					token.kind = Token_And;
+					if (*lexer->cursor == '&')
+					{
+						token.kind = Token_AndAnd;
+						++lexer->cursor;
+					}
+
+					if (*lexer->cursor == '=')
+					{
+						token.kind |= TOKEN_KIND__BINARY_ASS_BIT;
+						++lexer->cursor;
+					}
+				} break;
+
+				case '<':
+				{
+					token.kind = Token_Le;
+					if (*lexer->cursor == '<')
+					{
+						token.kind = Token_LeLe;
+						++lexer->cursor;
+					}
+
+					if (*lexer->cursor == '=')
+					{
+						token.kind |= TOKEN_KIND__BINARY_ASS_BIT;
+						++lexer->cursor;
+					}
+				} break;
+
+				case '>':
+				{
+					token.kind = Token_Ge;
+					if (*lexer->cursor == '>')
+					{
+						token.kind = Token_GeGe;
+						++lexer->cursor;
+					}
+					if (*lexer->cursor == '>')
+					{
+						token.kind = Token_GeGeGe;
+						++lexer->cursor;
+					}
+
+					if (*lexer->cursor == '=')
+					{
+						token.kind |= TOKEN_KIND__BINARY_ASS_BIT;
+						++lexer->cursor;
+					}
+				} break;
+
+				case '-':
+				{
+					token.kind = Token_Minus;
+
+					if (*lexer->cursor == '=')
+					{
+						token.kind |= TOKEN_KIND__BINARY_ASS_BIT;
+						++lexer->cursor;
+					}
+					else if (*lexer->cursor == '>')
+					{
+						token.kind = Token_Arrow;
+						++lexer->cursor;
+					}
+					else if (lexer->cursor[0] == '-' && lexer->cursor[1] == '-')
+					{
+						token.kind = Token_Strike;
+						lexer->cursor += 2;
+					}
+				} break;
+
+				case '.':
+				{
+					token.kind = Token_Dot;
+
+					if (*lexer->cursor == '(')
+					{
+						token.kind = Token_DotParen;
+						++lexer->cursor;
+					}
+					else if (*lexer->cursor == '[')
+					{
+						token.kind = Token_DotBracket;
+						++lexer->cursor;
+					}
+					else if (*lexer->cursor == '{')
+					{
+						token.kind = Token_DotBrace;
+						++lexer->cursor;
+					}
+					else if (Char_IsDigit(*lexer->cursor))
+					{
+						//// ERROR: You are a terrible person. I hate you.
+						NOT_IMPLEMENTED;
+					}
+				} break;
+
+				default:
+				{
+					lexer->cursor -= 1;
+					if (Char_IsDigit(*lexer->cursor))
+					{
+						token = Lexer__ParseNumber(lexer);
+					}
+					else if (*lexer->cursor == '"')
+					{
+						String string = Lexer__ParseString(lexer, '"');
+						token.kind = Token_String;
+						token.len  = string.len;
+						token.data = string.data;
+					}
+					else if (*lexer->cursor == '\'')
+					{
+						String string = Lexer__ParseString(lexer, '\'');
+						token.kind = Token_Char;
+						token.len  = string.len;
+						token.data = string.data;
+					}
+					else
+					{
+						NOT_IMPLEMENTED;
+					}
+				} break;
+			}
+		}
+#if 0
 		switch (c)
 		{
 			case '@': token.kind = Token_At;           break;
@@ -232,10 +448,33 @@ Lexer__NextToken(Lexer* lexer)
 
 			default:
 			{
-				//// ERROR
-				NOT_IMPLEMENTED;
+				lexer->cursor -= 1;
+				if (Char_IsDigit(*lexer->cursor))
+				{
+					token = Lexer__ParseNumber(lexer);
+				}
+				else if (*lexer->cursor == '"')
+				{
+					String string = Lexer__ParseString(lexer, '"');
+					token.kind = Token_String;
+					token.len  = string.len;
+					token.data = string.data;
+				}
+				else if (*lexer->cursor == '\'')
+				{
+					String string = Lexer__ParseString(lexer, '\'');
+					token.kind = Token_Char;
+					token.len  = string.len;
+					token.data = string.data;
+				}
+				else
+				{
+					//// ERROR
+					NOT_IMPLEMENTED;
+				}
 			} break;
 		}
+#endif
 	}
 
 	return token;

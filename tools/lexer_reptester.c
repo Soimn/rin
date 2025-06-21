@@ -10,6 +10,8 @@
 #undef far
 #undef near
 
+#include <immintrin.h>
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -124,6 +126,12 @@ wmain(int argc, wchar_t** argv)
 	{
 		for (umm i = 0; i < zpad; ++i) contents[file_size + i] = 0;
 
+		u64 lines = 0;
+		for (u8* scan = contents; *scan != 0; ++scan)
+		{
+			lines += (*scan == '\n');
+		}
+
 		LARGE_INTEGER perf_freq;
 		QueryPerformanceFrequency(&perf_freq);
 
@@ -146,11 +154,9 @@ wmain(int argc, wchar_t** argv)
 			LARGE_INTEGER start_t;
 			QueryPerformanceCounter(&start_t);
 
-			Lexer lexer = Lexer_Init(&tokens, &idents, &strings, contents);
-
 			Token* first_token = 0;
 			u32 token_count    = 0;
-			Lexer_LexFile(&lexer, &first_token, &token_count);
+			LexFile(&tokens, &idents, &strings, contents, &first_token, &token_count);
 
 			LARGE_INTEGER end_t;
 			QueryPerformanceCounter(&end_t);
@@ -164,15 +170,15 @@ wmain(int argc, wchar_t** argv)
 			u64 t_dus = (10000000*t)/perf_freq.QuadPart;
 
 			f64 throughput = ((f64)file_size*perf_freq.QuadPart)/t;
-			f64 mlocps     = (((f64)lexer.line*perf_freq.QuadPart)/t)/1000000;
+			f64 mlocps     = (((f64)lines*perf_freq.QuadPart)/t)/1000000;
 
 			ASSERT((u64)(0.5 + (throughput*t)/perf_freq.QuadPart) == (u64)file_size);
-			ASSERT((u64)(0.5 + ((mlocps*1000000)*t)/perf_freq.QuadPart) == (u64)lexer.line);
+			ASSERT((u64)(0.5 + ((mlocps*1000000)*t)/perf_freq.QuadPart) == lines);
 
 			if (i == 0)
 			{
-				wprintf(L"input file: %s (%f MB, %f Mloc)\n", argv[1], (f64)file_size/(1ULL << 20), (f64)lexer.line/1000000);
-				printf("\n run |     time     | throughput (MB) | throughput (lines of code)\n");
+				wprintf(L"input file: %s (%f MB, %f Mloc)\n", argv[1], (f64)file_size/(1ULL << 20), (f64)lines/1000000);
+				printf("\n run |    time      | throughput (MB) | throughput (lines of code)\n");
 				printf("-----+--------------+-----------------+-----------------------------\n");
 			}
 

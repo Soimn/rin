@@ -5,8 +5,6 @@ typedef struct Lexer
 	Virtual_Array* strings;
 	u8* contents;
 	u8* cursor;
-	u32 line;
-	u32 offset_to_line;
 } Lexer;
 
 static Token Lexer__ParseNumber(Lexer* lexer);
@@ -19,33 +17,36 @@ Lexer__NextToken(Lexer* lexer)
 
 	/// Skip all whitespace and comments
 	{
-		umm nesting = 0;
 		for (;;)
 		{
-			while (*lexer->cursor == ' ' || *lexer->cursor == '\t' || *lexer->cursor == '\r' || *lexer->cursor == '\f') ++lexer->cursor;
+			while (*lexer->cursor == ' ' || *lexer->cursor == '\t' || *lexer->cursor == '\r' || *lexer->cursor == '\f' || *lexer->cursor == '\n') ++lexer->cursor;
 
 			if (*lexer->cursor == 0) break;
-			else if (*lexer->cursor == '\n')
-			{
-				++lexer->cursor;
-				lexer->offset_to_line = (u32)(lexer->cursor - lexer->contents);
-				++lexer->line;
-			}
-			else if (nesting == 0 && lexer->cursor[0] == '/' && lexer->cursor[1] == '/')
+			else if (lexer->cursor[0] == '/' && lexer->cursor[1] == '/')
 			{
 				while (*lexer->cursor != 0 && *lexer->cursor != '\n') ++lexer->cursor;
 			}
 			else if (lexer->cursor[0] == '/' && lexer->cursor[1] == '*')
 			{
 				lexer->cursor += 2;
-				++nesting;
+
+				umm nesting = 1;
+				while (nesting > 0)
+				{
+					if (lexer->cursor[0] == '/' && lexer->cursor[1] == '*')
+					{
+						++nesting;
+						lexer->cursor += 2;
+					}
+					else if (lexer->cursor[0] == '*' && lexer->cursor[1] == '/')
+					{
+						--nesting;
+						lexer->cursor += 2;
+					}
+					else if (*lexer->cursor == 0) break;
+					else ++lexer->cursor;
+				}
 			}
-			else if (nesting > 0 && lexer->cursor[0] == '*' && lexer->cursor[1] == '/')
-			{
-				lexer->cursor += 2;
-				--nesting;
-			}
-			else if (nesting > 0) ++lexer->cursor;
 			else break;
 		}
 	}
@@ -564,31 +565,25 @@ Lexer__ParseString(Lexer* lexer, u8 terminator)
 	return real;
 }
 
-static Lexer
-Lexer_Init(Virtual_Array* tokens, Virtual_Array* idents, Virtual_Array* strings, u8* contents)
+static bool
+LexFile(Virtual_Array* tokens, Virtual_Array* idents, Virtual_Array* strings, u8* contents, Token** first_token, u32* token_count)
 {
-	return (Lexer){
+	bool encountered_errors = false;
+	
+	Lexer lexer = {
 		.tokens         = tokens,
 		.idents         = idents,
 		.strings        = strings,
 		.contents       = contents,
 		.cursor         = contents,
-		.line           = 1,
-		.offset_to_line = 0,
 	};
-}
 
-static bool
-Lexer_LexFile(Lexer* lexer, Token** first_token, u32* token_count)
-{
-	bool encountered_errors = false;
-
-	*first_token = VA_TopPointer(lexer->tokens);
+	*first_token = VA_TopPointer(lexer.tokens);
 
 	for (;;)
 	{
-		Token* token = VA_Push(lexer->tokens);
-		*token = Lexer__NextToken(lexer);
+		Token* token = VA_Push(lexer.tokens);
+		*token = Lexer__NextToken(&lexer);
 
 		if (token->kind == Token_EOF) break;
 		else if (token->kind == Token_Invalid)
@@ -599,7 +594,7 @@ Lexer_LexFile(Lexer* lexer, Token** first_token, u32* token_count)
 		}
 	}
 
-	*token_count = (u32)((Token*)VA_TopPointer(lexer->tokens) - *first_token);
+	*token_count = (u32)((Token*)VA_TopPointer(lexer.tokens) - *first_token);
 
 	return !encountered_errors;
 }

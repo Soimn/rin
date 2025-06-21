@@ -29,6 +29,7 @@ if "%2" neq "" goto invalid_arguments
 
 cl %compile_options% ..\tools\lex_crawler.c /link %link_options% /pdb:lex_crawler.pdb /out:lex_crawler.exe
 cl %compile_options% ..\tools\c_to_lexable_rin.c /link %link_options% /pdb:c_to_lexable_rin.pdb /out:c_to_lexable_rin.exe
+cl %compile_options% ..\tools\whitespace_skip_test.c /link %link_options% /pdb:whitespace_skip_test.pdb /out:whitespace_skip_test.exe
 
 goto end
 

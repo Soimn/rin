@@ -19,11 +19,11 @@ Lexer__NextToken(Lexer* lexer)
 	{
 		for (;;)
 		{
-			while (*lexer->cursor == ' ' || *lexer->cursor == '\t' || *lexer->cursor == '\r' || *lexer->cursor == '\f' || *lexer->cursor == '\n') ++lexer->cursor;
+			while ((u8)(*lexer->cursor-1) < (u8)0x20) ++lexer->cursor;
 
-			if (*lexer->cursor == 0) break;
-			else if (lexer->cursor[0] == '/' && lexer->cursor[1] == '/')
+			if (lexer->cursor[0] == '/' && lexer->cursor[1] == '/')
 			{
+				lexer->cursor += 2;
 				while (*lexer->cursor != 0 && *lexer->cursor != '\n') ++lexer->cursor;
 			}
 			else if (lexer->cursor[0] == '/' && lexer->cursor[1] == '*')

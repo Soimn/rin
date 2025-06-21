@@ -36,8 +36,13 @@ if not exist "%input_file%" (
 set "common_compile_options= /nologo /W4 /arch:AVX2 /wd4201"
 set "common_link_options= /incremental:no /opt:ref /subsystem:console"
 
-set "compile_options=%common_compile_options% /O2 /Z7 /Zo"
-set "link_options=%common_link_options% libvcruntime.lib"
+if "0"=="1" (
+	set "compile_options=%common_compile_options% /Od /Z7 /Zo /RTC1"
+	set "link_options=%common_link_options% /DEBUG:FULL libucrtd.lib libvcruntimed.lib"
+) else (
+	set "compile_options=%common_compile_options% /O2 /Z7 /Zo"
+	set "link_options=%common_link_options% libvcruntime.lib"
+)
 
 cl %compile_options% ..\tools\lexer_reptester.c /I"%reptest%" /link %link_options% /pdb:lexer_reptester.pdb /out:lexer_reptester.exe && lexer_reptester %input_file%
 

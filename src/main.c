@@ -33,6 +33,8 @@
 #undef far
 #undef near
 
+#include <immintrin.h>
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
