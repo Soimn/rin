@@ -65,8 +65,9 @@ static void AssertionFailed(const char* file, int line, const char* expr);
 #define NOT_IMPLEMENTED ASSERT(!"NOT_IMPLEMENTED")
 
 #include "memory.h"
-#include "string.h"
+#include "strings.h"
 #include "virtual_array.h"
+#include "u128.h"
 #include "tokens.h"
 #include "lexer.h"
 
@@ -109,6 +110,12 @@ CommitMemory(void* commit_base, umm bytes_to_commit)
 		//// ERROR: Out of memory
 		NOT_IMPLEMENTED;
 	}
+}
+
+static void
+FreeMemory(void* reserve_base)
+{
+	VirtualFree(reserve_base, 0, MEM_RELEASE);
 }
 
 int
