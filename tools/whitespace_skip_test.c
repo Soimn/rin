@@ -115,14 +115,15 @@ SIMDBasicSignedSkip(u8* contents)
 			__m256i c = _mm256_loadu_si256((__m256i*)cursor);
 			int whitespace_mask = _mm256_movemask_epi8(_mm256_cmpgt_epi8(_mm256_add_epi8(c, hex_5f), hex_5f));
 
-			unsigned long skip;
-			if (_BitScanForward(&skip, whitespace_mask+1) == 0)
+			if (whitespace_mask == -1)
 			{
 				cursor += 32;
 				continue;
 			}
 			else
 			{
+				unsigned long skip;
+				if (_BitScanForward(&skip, whitespace_mask+1) == 0) skip = 0;
 				cursor += skip;
 				break;
 			}
@@ -199,7 +200,7 @@ main(int argc, char** argv)
 	u64* results = VirtualAlloc(0, ARRAY_LEN(Tests)*max_skip, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 	ASSERT(results != 0);
 
-	u64 text_len = 1ULL << 30;
+	u64 text_len = 1ULL << 25;
 	u8* text = VirtualAlloc(0, text_len + 4096, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 	ASSERT(text != 0);
 
@@ -246,6 +247,8 @@ main(int argc, char** argv)
 
 			cursor += k;
 
+			text[cursor] = 0;
+
 			reference_as_div_bs = as/bs;
 		}
 
@@ -270,7 +273,7 @@ main(int argc, char** argv)
 				ASSERT(as_div_bs == reference_as_div_bs);
 			}
 
-			results[i*ARRAY_LEN(Tests) + j] = min_t;
+			results[(i-1)*ARRAY_LEN(Tests) + j] = min_t;
 		}
 	}
 
@@ -281,18 +284,19 @@ main(int argc, char** argv)
 	for (umm i = 0; i < ARRAY_LEN(Tests); ++i) fprintf(out, ",%s", Tests[i].name);
 	fprintf(out, "\n");
 
-	for (umm i = 0; i < max_skip; ++i)
+	for (umm i = 1; i <= max_skip; ++i)
 	{
 		fprintf(out, "%llu", i);
 
 		for (umm j = 0; j < ARRAY_LEN(Tests); ++j)
 		{
-			u64 ticks = results[i*ARRAY_LEN(Tests) + j];
+			u64 ticks = results[(i-1)*ARRAY_LEN(Tests) + j];
 
 			f64 text_size_mb = (f64)text_len/(1ULL << 20);
-			f64 mbs = (f64)(text_size_mb*ticks)/perf_freq.QuadPart;
+			//printf("%llu, %f, %f\n", ticks, text_size_mb, (f64)ticks/perf_freq.QuadPart);
+			f64 mbs = (f64)(text_size_mb*perf_freq.QuadPart)/ticks;
 
-			ASSERT((u64)(0.5 + (mbs*perf_freq.QuadPart)/text_size_mb) == ticks);
+			ASSERT((u64)(0.5 + (mbs*ticks)/text_size_mb) == (u64)perf_freq.QuadPart);
 
 			fprintf(out, ",% 11.6f", mbs);
 		}
