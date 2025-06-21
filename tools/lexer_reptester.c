@@ -136,6 +136,13 @@ wmain(int argc, wchar_t** argv)
 			Virtual_Array idents  = VA_Create(sizeof(u8), ~0ULL - 4096);
 			Virtual_Array strings = VA_Create(sizeof(u8), ~0ULL - 4096);
 
+			CommitMemory(tokens.data, tokens.reserved); tokens.committed = tokens.reserved;
+			CommitMemory(idents.data, idents.reserved); idents.committed = idents.reserved;
+			CommitMemory(strings.data, strings.reserved); strings.committed = strings.reserved;
+			memset(tokens.data, '0', tokens.committed);
+			memset(idents.data, '0', idents.committed);
+			memset(strings.data, '0', strings.committed);
+
 			LARGE_INTEGER start_t;
 			QueryPerformanceCounter(&start_t);
 
