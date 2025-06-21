@@ -1,6 +1,7 @@
 @echo off
 setlocal
 
+set "reptest=%~f1"
 set "input_file=%~f2"
 
 cd %~dp0
@@ -14,7 +15,7 @@ if "%Platform%" neq "x64" (
 	goto end
 )
 
-if "%1"=="" (
+if "%reptest%"=="" (
 	goto invalid_arguments
 ) else if "%input_file%"=="" (
 	goto invalid_arguments
@@ -22,7 +23,7 @@ if "%1"=="" (
 	goto invalid_arguments
 )
 
-if not exist "..\tools\%1" (
+if not exist "%reptest%" (
 	echo Reptest does not exist
 	goto end
 )
@@ -38,14 +39,14 @@ set "common_link_options= /incremental:no /opt:ref /subsystem:console"
 set "compile_options=%common_compile_options% /O2 /Z7 /Zo"
 set "link_options=%common_link_options% libvcruntime.lib"
 
-cl %compile_options% ..\tools\lexer_reptester.c /I"..\tools\%1" /link %link_options% /pdb:lexer_reptester.pdb /out:lexer_reptester.exe
+cl %compile_options% ..\tools\lexer_reptester.c /I"%reptest%" /link %link_options% /pdb:lexer_reptester.pdb /out:lexer_reptester.exe
 
 call lexer_reptester %input_file%
 
 goto end
 
 :invalid_arguments
-echo Invalid arguments^. Expected: %0 ^[reptest name^] ^[input file^]
+echo Invalid arguments^. Expected: %0 ^[path to reptest^] ^[path to input file^]
 goto end
 
 :end
