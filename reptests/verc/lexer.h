@@ -11,7 +11,6 @@ typedef struct Lexer
 static Token Lexer__ParseNumber(Lexer* lexer);
 static String Lexer__ParseString(Lexer* lexer, u8 terminator);
 
-__forceinline
 static Token
 Lexer__NextToken(Lexer* lexer)
 {
@@ -25,7 +24,7 @@ Lexer__NextToken(Lexer* lexer)
 		{
 			while ((u8)(*cursor-1) < (u8)0x20)
 			{
-				line += (*cursor == '\n');
+				//line += (*cursor == '\n');
 				++cursor;
 			}
 
@@ -51,15 +50,11 @@ Lexer__NextToken(Lexer* lexer)
 						--nesting;
 						cursor += 2;
 					}
+					else if (*cursor == 0) break;
 					else
 					{
 						line += (*cursor == '\n');
-						if (*cursor != 0)
-						{
-							++cursor;
-							continue;
-						}
-						else break;
+						++cursor;
 					}
 				}
 			}
@@ -74,83 +69,11 @@ Lexer__NextToken(Lexer* lexer)
 
 	if (Char_IsAlpha(*lexer->cursor) || *lexer->cursor == '_')
 	{
-		u8* cursor = lexer->cursor;
+		while (Char_IsAlpha(*lexer->cursor) || Char_IsDigit(*lexer->cursor) || *lexer->cursor == '_') ++lexer->cursor;
 
-		/*
-		__m128i lo_mask      = _mm_set1_epi8(0xDF);
-		__m128i alpha_bias   = _mm_set1_epi8(0x7F - 'Z');
-		__m128i alpha_thresh = _mm_set1_epi8(0x7E - ('Z' - 'A'));
-		__m128i num_bias     = _mm_set1_epi8(0x7F - '9');
-		__m128i num_thresh   = _mm_set1_epi8(0x7E - ('9' - '0'));
-		__m128i underscore   = _mm_set1_epi8('_');
-
-		for (;;)
-		{
-			__m128i c = _mm_loadu_si128((__m128i*)cursor);
-
-			__m128i alpha_test      = _mm_cmpgt_epi8(_mm_add_epi8(_mm_and_si128(c, lo_mask), alpha_bias), alpha_thresh);
-			__m128i num_test        = _mm_cmpgt_epi8(_mm_add_epi8(c, num_bias), num_thresh);
-			__m128i underscore_test = _mm_cmpeq_epi8(c, underscore);
-
-			int mask = (_mm_movemask_epi8(alpha_test) | _mm_movemask_epi8(num_test) | _mm_movemask_epi8(underscore_test));
-			
-			if (mask == 0) break;
-			else if (mask == 0xFFFF)
-			{
-				cursor += 16;
-				continue;
-			}
-			else
-			{
-				unsigned long skip;
-				_BitScanForward(&skip, mask+1);
-
-				cursor += skip;
-				break;
-			}
-		}
-		*/
-
-		__m256i lo_mask      = _mm256_set1_epi8(0xDF);
-		__m256i alpha_bias   = _mm256_set1_epi8(0x7F - 'Z');
-		__m256i alpha_thresh = _mm256_set1_epi8(0x7E - ('Z' - 'A'));
-		__m256i num_bias     = _mm256_set1_epi8(0x7F - '9');
-		__m256i num_thresh   = _mm256_set1_epi8(0x7E - ('9' - '0'));
-		__m256i underscore   = _mm256_set1_epi8('_');
-
-		for (;;)
-		{
-			__m256i c = _mm256_loadu_si256((__m256i*)cursor);
-
-			__m256i alpha_test      = _mm256_cmpgt_epi8(_mm256_add_epi8(_mm256_and_si256(c, lo_mask), alpha_bias), alpha_thresh);
-			__m256i num_test        = _mm256_cmpgt_epi8(_mm256_add_epi8(c, num_bias), num_thresh);
-			__m256i underscore_test = _mm256_cmpeq_epi8(c, underscore);
-
-			int mask = (_mm256_movemask_epi8(alpha_test) | _mm256_movemask_epi8(num_test) | _mm256_movemask_epi8(underscore_test));
-			
-			if (mask == 0) break;
-			else if (mask == -1)
-			{
-				cursor += 32;
-				continue;
-			}
-			else
-			{
-				unsigned long skip;
-				_BitScanForward(&skip, mask+1);
-
-				cursor += skip;
-				break;
-			}
-		}
-
-		lexer->cursor = cursor;
-
-		return (Token){
-			.kind = Token_Ident,
-			.len  = (u32)(lexer->cursor - start),
-			.data = start,
-		};
+		token.kind = Token_Ident;
+		token.len  = (u32)(lexer->cursor - start);
+		token.data = start;
 	}
 	else if (*lexer->cursor == 0)
 	{
@@ -336,7 +259,6 @@ Lexer__NextToken(Lexer* lexer)
 	return token;
 }
 
-__forceinline
 static Token
 Lexer__ParseNumber(Lexer* lexer)
 {
@@ -433,7 +355,7 @@ Lexer__ParseNumber(Lexer* lexer)
 
 		u64 digit_count = (lexer->cursor - start) - underscore_count;
 
-		if (*lexer->cursor == '.' && (Char_IsDigit(lexer->cursor[1]) || (*lexer->cursor&0xDF) == 'E'))
+		if (*lexer->cursor == '.' && Char_IsDigit(lexer->cursor[1]) || (*lexer->cursor&0xDF) == 'E')
 		{
 			NOT_IMPLEMENTED;
 		}
@@ -460,7 +382,7 @@ Lexer__ParseNumber(Lexer* lexer)
 				else break;
 			}
 
-			if (overflow || value128.hi != 0)
+			if (value128.hi != 0)
 			{
 				//// ERROR: does not fit in 64 bits
 				NOT_IMPLEMENTED;
@@ -481,7 +403,6 @@ Lexer__ParseNumber(Lexer* lexer)
 	return token;
 }
 
-__forceinline
 static String
 Lexer__ParseString(Lexer* lexer, u8 terminator)
 {

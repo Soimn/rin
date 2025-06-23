@@ -11,7 +11,7 @@ typedef struct Lexer
 static Token Lexer__ParseNumber(Lexer* lexer);
 static String Lexer__ParseString(Lexer* lexer, u8 terminator);
 
-__forceinline
+//__forceinline
 static Token
 Lexer__NextToken(Lexer* lexer)
 {
@@ -76,7 +76,6 @@ Lexer__NextToken(Lexer* lexer)
 	{
 		u8* cursor = lexer->cursor;
 
-		/*
 		__m128i lo_mask      = _mm_set1_epi8(0xDF);
 		__m128i alpha_bias   = _mm_set1_epi8(0x7F - 'Z');
 		__m128i alpha_thresh = _mm_set1_epi8(0x7E - ('Z' - 'A'));
@@ -98,40 +97,6 @@ Lexer__NextToken(Lexer* lexer)
 			else if (mask == 0xFFFF)
 			{
 				cursor += 16;
-				continue;
-			}
-			else
-			{
-				unsigned long skip;
-				_BitScanForward(&skip, mask+1);
-
-				cursor += skip;
-				break;
-			}
-		}
-		*/
-
-		__m256i lo_mask      = _mm256_set1_epi8(0xDF);
-		__m256i alpha_bias   = _mm256_set1_epi8(0x7F - 'Z');
-		__m256i alpha_thresh = _mm256_set1_epi8(0x7E - ('Z' - 'A'));
-		__m256i num_bias     = _mm256_set1_epi8(0x7F - '9');
-		__m256i num_thresh   = _mm256_set1_epi8(0x7E - ('9' - '0'));
-		__m256i underscore   = _mm256_set1_epi8('_');
-
-		for (;;)
-		{
-			__m256i c = _mm256_loadu_si256((__m256i*)cursor);
-
-			__m256i alpha_test      = _mm256_cmpgt_epi8(_mm256_add_epi8(_mm256_and_si256(c, lo_mask), alpha_bias), alpha_thresh);
-			__m256i num_test        = _mm256_cmpgt_epi8(_mm256_add_epi8(c, num_bias), num_thresh);
-			__m256i underscore_test = _mm256_cmpeq_epi8(c, underscore);
-
-			int mask = (_mm256_movemask_epi8(alpha_test) | _mm256_movemask_epi8(num_test) | _mm256_movemask_epi8(underscore_test));
-			
-			if (mask == 0) break;
-			else if (mask == -1)
-			{
-				cursor += 32;
 				continue;
 			}
 			else

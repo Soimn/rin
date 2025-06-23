@@ -135,21 +135,22 @@ wmain(int argc, wchar_t** argv)
 		LARGE_INTEGER perf_freq;
 		QueryPerformanceFrequency(&perf_freq);
 
+		Virtual_Array tokens  = VA_Create(sizeof(Token), ~0U - 4096);
+		Virtual_Array idents  = VA_Create(sizeof(u8), ~0U - 4096);
+		Virtual_Array strings = VA_Create(sizeof(u8), ~0U - 4096);
+
+		CommitMemory(tokens.data, tokens.reserved); tokens.committed = tokens.reserved;
+		CommitMemory(idents.data, idents.reserved); idents.committed = idents.reserved;
+		CommitMemory(strings.data, strings.reserved); strings.committed = strings.reserved;
+		memset(tokens.data, '0', tokens.committed);
+		memset(idents.data, '0', idents.committed);
+		memset(strings.data, '0', strings.committed);
+
 		u64 min_dus        = ~0ULL;
 		f64 max_throughput = 0;
 		f64 max_mlocps     = 0;
 		for (umm i = 0; i < 10; ++i)
 		{
-			Virtual_Array tokens  = VA_Create(sizeof(Token), ~0ULL - 4096);
-			Virtual_Array idents  = VA_Create(sizeof(u8), ~0ULL - 4096);
-			Virtual_Array strings = VA_Create(sizeof(u8), ~0ULL - 4096);
-
-			CommitMemory(tokens.data, tokens.reserved); tokens.committed = tokens.reserved;
-			CommitMemory(idents.data, idents.reserved); idents.committed = idents.reserved;
-			CommitMemory(strings.data, strings.reserved); strings.committed = strings.reserved;
-			memset(tokens.data, '0', tokens.committed);
-			memset(idents.data, '0', idents.committed);
-			memset(strings.data, '0', strings.committed);
 
 			LARGE_INTEGER start_t;
 			QueryPerformanceCounter(&start_t);
@@ -161,9 +162,9 @@ wmain(int argc, wchar_t** argv)
 			LARGE_INTEGER end_t;
 			QueryPerformanceCounter(&end_t);
 
-			VA_Destroy(&tokens);
-			VA_Destroy(&idents);
-			VA_Destroy(&strings);
+			tokens.offset = 0;
+			idents.offset = 0;
+			strings.offset = 0;
 
 			u64 t = end_t.QuadPart - start_t.QuadPart;
 
@@ -182,7 +183,7 @@ wmain(int argc, wchar_t** argv)
 				printf("-----+--------------+-----------------+-----------------------------\n");
 			}
 
-			printf("  % 2llu | % 4llu.%04llu ms |  % 8.3f MB/s  | % 8.3f Mloc/s\n", i, t_dus/10000, t_dus%10000, throughput/(1ULL << 20), mlocps);
+			printf("  %2llu | %4llu.%04llu ms |  % 8.3f MB/s  | % 8.3f Mloc/s\n", i, t_dus/10000, t_dus%10000, throughput/(1ULL << 20), mlocps);
 
 			if (t_dus < min_dus)
 			{
@@ -192,7 +193,7 @@ wmain(int argc, wchar_t** argv)
 			}
 		}
 
-		printf("min: % 4llu.%04llu ms, %f MB/s, %f Mloc/s\n", min_dus/10000, min_dus%10000, max_throughput/(1ULL << 20), max_mlocps);
+		printf("min: %4llu.%04llu ms, %f MB/s, %f Mloc/s\n", min_dus/10000, min_dus%10000, max_throughput/(1ULL << 20), max_mlocps);
 	}
 
 	return 0;

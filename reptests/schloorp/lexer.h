@@ -51,15 +51,11 @@ Lexer__NextToken(Lexer* lexer)
 						--nesting;
 						cursor += 2;
 					}
+					else if (*cursor == 0) break;
 					else
 					{
 						line += (*cursor == '\n');
-						if (*cursor != 0)
-						{
-							++cursor;
-							continue;
-						}
-						else break;
+						++cursor;
 					}
 				}
 			}
@@ -76,72 +72,12 @@ Lexer__NextToken(Lexer* lexer)
 	{
 		u8* cursor = lexer->cursor;
 
-		/*
-		__m128i lo_mask      = _mm_set1_epi8(0xDF);
-		__m128i alpha_bias   = _mm_set1_epi8(0x7F - 'Z');
-		__m128i alpha_thresh = _mm_set1_epi8(0x7E - ('Z' - 'A'));
-		__m128i num_bias     = _mm_set1_epi8(0x7F - '9');
-		__m128i num_thresh   = _mm_set1_epi8(0x7E - ('9' - '0'));
-		__m128i underscore   = _mm_set1_epi8('_');
-
-		for (;;)
+		for (;; ++cursor)
 		{
-			__m128i c = _mm_loadu_si128((__m128i*)cursor);
-
-			__m128i alpha_test      = _mm_cmpgt_epi8(_mm_add_epi8(_mm_and_si128(c, lo_mask), alpha_bias), alpha_thresh);
-			__m128i num_test        = _mm_cmpgt_epi8(_mm_add_epi8(c, num_bias), num_thresh);
-			__m128i underscore_test = _mm_cmpeq_epi8(c, underscore);
-
-			int mask = (_mm_movemask_epi8(alpha_test) | _mm_movemask_epi8(num_test) | _mm_movemask_epi8(underscore_test));
-			
-			if (mask == 0) break;
-			else if (mask == 0xFFFF)
-			{
-				cursor += 16;
-				continue;
-			}
-			else
-			{
-				unsigned long skip;
-				_BitScanForward(&skip, mask+1);
-
-				cursor += skip;
-				break;
-			}
-		}
-		*/
-
-		__m256i lo_mask      = _mm256_set1_epi8(0xDF);
-		__m256i alpha_bias   = _mm256_set1_epi8(0x7F - 'Z');
-		__m256i alpha_thresh = _mm256_set1_epi8(0x7E - ('Z' - 'A'));
-		__m256i num_bias     = _mm256_set1_epi8(0x7F - '9');
-		__m256i num_thresh   = _mm256_set1_epi8(0x7E - ('9' - '0'));
-		__m256i underscore   = _mm256_set1_epi8('_');
-
-		for (;;)
-		{
-			__m256i c = _mm256_loadu_si256((__m256i*)cursor);
-
-			__m256i alpha_test      = _mm256_cmpgt_epi8(_mm256_add_epi8(_mm256_and_si256(c, lo_mask), alpha_bias), alpha_thresh);
-			__m256i num_test        = _mm256_cmpgt_epi8(_mm256_add_epi8(c, num_bias), num_thresh);
-			__m256i underscore_test = _mm256_cmpeq_epi8(c, underscore);
-
-			int mask = (_mm256_movemask_epi8(alpha_test) | _mm256_movemask_epi8(num_test) | _mm256_movemask_epi8(underscore_test));
-			
-			if (mask == 0) break;
-			else if (mask == -1)
-			{
-				cursor += 32;
-				continue;
-			}
-			else
-			{
-				unsigned long skip;
-				_BitScanForward(&skip, mask+1);
-
-				cursor += skip;
-				break;
-			}
+			if ((u8)((*cursor&0xDF) - 'A') <= (u8)('Z' - 'A')) continue;
+			if (*cursor == '_')                                continue;
+			if ((u8)(*cursor - '0') < (u8)10)                  continue;
+			break;
 		}
 
 		lexer->cursor = cursor;

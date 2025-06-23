@@ -10,19 +10,19 @@ if "%1"=="" (
 	goto invalid_arguments
 )
 
-if exist "%1" (
+if exist "..\reptests\%1" (
 	echo Reptest already exists
 	goto end
 )
 
-mkdir "%1"
+mkdir "..\reptests\%1"
 
-copy ..\src\memory.h %1\.
-copy ..\src\strings.h %1\.
-copy ..\src\virtual_array.h %1\.
-copy ..\src\u128.h %1\.
-copy ..\src\tokens.h %1\.
-copy ..\src\lexer.h %1\.
+copy ..\src\memory.h ..\reptests\%1\.
+copy ..\src\strings.h ..\reptests\%1\.
+copy ..\src\virtual_array.h ..\reptests\%1\.
+copy ..\src\u128.h ..\reptests\%1\.
+copy ..\src\tokens.h ..\reptests\%1\.
+copy ..\src\lexer.h ..\reptests\%1\.
 
 goto end
 

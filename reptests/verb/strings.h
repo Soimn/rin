@@ -1,12 +1,10 @@
-__forceinline
-static bool
+bool
 Char_IsDigit(u8 c)
 {
 	return ((u8)(c - '0') < (u8)10);
 }
 
-__forceinline
-static bool
+bool
 Char_IsAlpha(u8 c)
 {
 	return ((u8)((c & 0xDF) - 'A') <= (u8)('Z' - 'A'));
