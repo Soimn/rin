@@ -76,41 +76,6 @@ Lexer__NextToken(Lexer* lexer)
 	{
 		u8* cursor = lexer->cursor;
 
-		/*
-		__m128i lo_mask      = _mm_set1_epi8(0xDF);
-		__m128i alpha_bias   = _mm_set1_epi8(0x7F - 'Z');
-		__m128i alpha_thresh = _mm_set1_epi8(0x7E - ('Z' - 'A'));
-		__m128i num_bias     = _mm_set1_epi8(0x7F - '9');
-		__m128i num_thresh   = _mm_set1_epi8(0x7E - ('9' - '0'));
-		__m128i underscore   = _mm_set1_epi8('_');
-
-		for (;;)
-		{
-			__m128i c = _mm_loadu_si128((__m128i*)cursor);
-
-			__m128i alpha_test      = _mm_cmpgt_epi8(_mm_add_epi8(_mm_and_si128(c, lo_mask), alpha_bias), alpha_thresh);
-			__m128i num_test        = _mm_cmpgt_epi8(_mm_add_epi8(c, num_bias), num_thresh);
-			__m128i underscore_test = _mm_cmpeq_epi8(c, underscore);
-
-			int mask = (_mm_movemask_epi8(alpha_test) | _mm_movemask_epi8(num_test) | _mm_movemask_epi8(underscore_test));
-			
-			if (mask == 0) break;
-			else if (mask == 0xFFFF)
-			{
-				cursor += 16;
-				continue;
-			}
-			else
-			{
-				unsigned long skip;
-				_BitScanForward(&skip, mask+1);
-
-				cursor += skip;
-				break;
-			}
-		}
-		*/
-
 		__m256i lo_mask      = _mm256_set1_epi8(0xDF);
 		__m256i alpha_bias   = _mm256_set1_epi8(0x7F - 'Z');
 		__m256i alpha_thresh = _mm256_set1_epi8(0x7E - ('Z' - 'A'));
@@ -161,6 +126,9 @@ Lexer__NextToken(Lexer* lexer)
 		u8 c = *lexer->cursor;
 		++lexer->cursor;
 
+		u8 c1_eq      = (*lexer->cursor == '=');
+		u16 c1_eq_bit = (*lexer->cursor == '=' ? TOKEN_KIND__BINARY_ASS_BIT : 0);
+
 		switch (c)
 		{
 			case '@': token.kind = Token_At;           break;
@@ -178,11 +146,11 @@ Lexer__NextToken(Lexer* lexer)
 			case '{': token.kind = Token_OpenBrace;    break;
 			case '}': token.kind = Token_CloseBrace;   break;
 
-			case '*': token.kind = (*lexer->cursor == '=' ? Token_StarEq    : Token_Star);    lexer->cursor += (*lexer->cursor == '='); break;
-			case '/': token.kind = (*lexer->cursor == '=' ? Token_SlashEq   : Token_Slash);   lexer->cursor += (*lexer->cursor == '='); break;
-			case '%': token.kind = (*lexer->cursor == '=' ? Token_PercentEq : Token_Percent); lexer->cursor += (*lexer->cursor == '='); break;
-			case '+': token.kind = (*lexer->cursor == '=' ? Token_PlusEq    : Token_Plus);    lexer->cursor += (*lexer->cursor == '='); break;
-			case '~': token.kind = (*lexer->cursor == '=' ? Token_TildeEq   : Token_Tilde);   lexer->cursor += (*lexer->cursor == '='); break;
+			case '*': token.kind = Token_Star    | c1_eq_bit; lexer->cursor += c1_eq; break;
+			case '/': token.kind = Token_Slash   | c1_eq_bit; lexer->cursor += c1_eq; break;
+			case '%': token.kind = Token_Percent | c1_eq_bit; lexer->cursor += c1_eq; break;
+			case '+': token.kind = Token_Plus    | c1_eq_bit; lexer->cursor += c1_eq; break;
+			case '~': token.kind = Token_Tilde   | c1_eq_bit; lexer->cursor += c1_eq; break;
 
 			case '=': token.kind = (*lexer->cursor == '=' ? Token_EqEq   : Token_Eq);   lexer->cursor += (*lexer->cursor == '='); break;
 			case '!': token.kind = (*lexer->cursor == '=' ? Token_BangEq : Token_Bang); lexer->cursor += (*lexer->cursor == '='); break;
