@@ -4,11 +4,13 @@ typedef struct Lexer
 	Virtual_Array* strings;
 	u8* contents;
 	u8* cursor;
+	u32 line;
 } Lexer;
 
-static Token Lexer__ParseNumber(Lexer* lexer);
-static String Lexer__ParseString(Lexer* lexer, u8 terminator);
+__forceinline static Token Lexer__ParseNumber(Lexer* lexer);
+__forceinline static String Lexer__ParseString(Lexer* lexer, u8 terminator);
 
+__forceinline
 static Token
 Lexer__NextToken(Lexer* lexer)
 {
@@ -16,102 +18,155 @@ Lexer__NextToken(Lexer* lexer)
 
 	/// Skip all whitespace and comments
 	{
+		u8* cursor = lexer->cursor;
+		u32 line   = lexer->line;
 		for (;;)
 		{
-			while (*lexer->cursor == ' ' || *lexer->cursor == '\t' || *lexer->cursor == '\r' || *lexer->cursor == '\f' || *lexer->cursor == '\n') ++lexer->cursor;
-
-			if (*lexer->cursor == 0) break;
-			else if (lexer->cursor[0] == '/' && lexer->cursor[1] == '/')
+			while ((u8)(*cursor-1) < (u8)0x20)
 			{
-				while (*lexer->cursor != 0 && *lexer->cursor != '\n') ++lexer->cursor;
+				line += (*cursor == '\n');
+				++cursor;
 			}
-			else if (lexer->cursor[0] == '/' && lexer->cursor[1] == '*')
-			{
-				lexer->cursor += 2;
 
-				umm nesting = 1;
-				while (nesting > 0)
+			if (cursor[0] == '/' && cursor[1] == '/')
+			{
+				cursor += 2;
+				while (*cursor != 0 && *cursor != '\n') ++cursor;
+			}
+			else if (cursor[0] == '/' && cursor[1] == '*')
+			{
+				cursor += 2;
+
+				while (*cursor != 0 && !(cursor[0] == '*' && cursor[1] == '/')) ++cursor;
+
+				if (*cursor != 0) cursor += 2;
+				else
 				{
-					if (lexer->cursor[0] == '/' && lexer->cursor[1] == '*')
-					{
-						++nesting;
-						lexer->cursor += 2;
-					}
-					else if (lexer->cursor[0] == '*' && lexer->cursor[1] == '/')
-					{
-						--nesting;
-						lexer->cursor += 2;
-					}
-					else if (*lexer->cursor == 0) break;
-					else ++lexer->cursor;
+					//// ERROR: Unterminated block comment
+					NOT_IMPLEMENTED;
 				}
 			}
 			else break;
 		}
+
+		lexer->cursor = cursor;
+		lexer->line   = line;
 	}
 
+	u32 offset = (u32)(lexer->cursor - lexer->contents);
 	u8* start = lexer->cursor;
+
+	token.offset = offset;
 
 	if (Char_IsAlpha(*lexer->cursor) || *lexer->cursor == '_')
 	{
-		while (Char_IsAlpha(*lexer->cursor) || Char_IsDigit(*lexer->cursor) || *lexer->cursor == '_') ++lexer->cursor;
+		u8* cursor = lexer->cursor;
 
-		token.kind = Token_Ident;
-		token.len  = (u32)(lexer->cursor - start);
-		token.data = start;
-	}
-	else if (Char_IsDigit(*lexer->cursor))
-	{
-		token = Lexer__ParseNumber(lexer);
-	}
-	else if (*lexer->cursor == '"')
-	{
-		String string = Lexer__ParseString(lexer, '"');
-		token.kind = Token_String;
-		token.len  = string.len;
-		token.data = string.data;
-	}
-	else if (*lexer->cursor == '\'')
-	{
-		String string = Lexer__ParseString(lexer, '\'');
-		token.kind = Token_Char;
-		token.len  = string.len;
-		token.data = string.data;
-	}
-	else if (*lexer->cursor == 0)
-	{
-		token.kind = Token_EOF;
+		__m256i lo_mask      = _mm256_set1_epi8(0xDF);
+		__m256i alpha_bias   = _mm256_set1_epi8(0x7F - 'Z');
+		__m256i alpha_thresh = _mm256_set1_epi8(0x7E - ('Z' - 'A'));
+		__m256i num_bias     = _mm256_set1_epi8(0x7F - '9');
+		__m256i num_thresh   = _mm256_set1_epi8(0x7E - ('9' - '0'));
+		__m256i underscore   = _mm256_set1_epi8('_');
+
+		__m256i c = _mm256_loadu_si256((__m256i*)cursor);
+
+		__m256i alpha_test      = _mm256_cmpgt_epi8(_mm256_add_epi8(_mm256_and_si256(c, lo_mask), alpha_bias), alpha_thresh);
+		__m256i num_test        = _mm256_cmpgt_epi8(_mm256_add_epi8(c, num_bias), num_thresh);
+		__m256i underscore_test = _mm256_cmpeq_epi8(c, underscore);
+
+		int mask = _mm256_movemask_epi8(alpha_test) | _mm256_movemask_epi8(_mm256_or_si256(num_test, underscore_test));
+
+		unsigned long skip;
+		_BitScanForward(&skip, mask+1);
+
+		if (mask != -1) cursor += skip;
+		else
+		{
+			for (;;)
+			{
+				c = _mm256_loadu_si256((__m256i*)cursor);
+
+				alpha_test      = _mm256_cmpgt_epi8(_mm256_add_epi8(_mm256_and_si256(c, lo_mask), alpha_bias), alpha_thresh);
+				num_test        = _mm256_cmpgt_epi8(_mm256_add_epi8(c, num_bias), num_thresh);
+				underscore_test = _mm256_cmpeq_epi8(c, underscore);
+
+				mask = _mm256_movemask_epi8(alpha_test) | _mm256_movemask_epi8(_mm256_or_si256(num_test, underscore_test));
+
+				if (mask == 0) break;
+				else if (mask == -1)
+				{
+					cursor += 32;
+					continue;
+				}
+				else
+				{
+					_BitScanForward(&skip, mask+1);
+
+					cursor += skip;
+					break;
+				}
+			}
+		}
+
+
+		lexer->cursor = cursor;
+
+		u32 len = (u32)(lexer->cursor - start);
+
+		if (len > 0xFFFF)
+		{
+			//// ERROR: Identifier is too long
+			NOT_IMPLEMENTED;
+		}
+
+		return (Token){
+			.kind   = Token_Ident,
+			.offset = offset,
+			.len    = (u16)len,
+			.data   = start,
+		};
 	}
 	else
 	{
+		// NOTE: There is at least 32 0's at the end of the file => going a bit past the end is not a problem
+
 		u8 c = *lexer->cursor;
 		++lexer->cursor;
 
+		u8 c1_eq      = (*lexer->cursor == '=');
+		u16 c1_eq_bit = (*lexer->cursor == '=' ? TOKEN_KIND__BINARY_ASS_BIT : 0);
+
 		switch (c)
 		{
-			case '@': token.kind = Token_At;           break;
-			case '#': token.kind = Token_Pound;        break;
-			case '$': token.kind = Token_Cash;         break;
-			case '?': token.kind = Token_QMark;        break;
-			case ':': token.kind = Token_Colon;        break;
-			case ',': token.kind = Token_Comma;        break;
-			case ';': token.kind = Token_Semicolon;    break;
-			case '^': token.kind = Token_Hat;          break;
-			case '(': token.kind = Token_OpenParen;    break;
-			case ')': token.kind = Token_CloseParen;   break;
-			case '[': token.kind = Token_OpenBracket;  break;
-			case ']': token.kind = Token_CloseBracket; break;
-			case '{': token.kind = Token_OpenBrace;    break;
-			case '}': token.kind = Token_CloseBrace;   break;
+			case 0: token.kind = Token_EOF; break;
 
-			case '*': token.kind = (*lexer->cursor == '=' ? Token_StarEq    : Token_Star);    lexer->cursor += (*lexer->cursor == '='); break;
-			case '/': token.kind = (*lexer->cursor == '=' ? Token_SlashEq   : Token_Slash);   lexer->cursor += (*lexer->cursor == '='); break;
-			case '%': token.kind = (*lexer->cursor == '=' ? Token_PercentEq : Token_Percent); lexer->cursor += (*lexer->cursor == '='); break;
-			case '+': token.kind = (*lexer->cursor == '=' ? Token_PlusEq    : Token_Plus);    lexer->cursor += (*lexer->cursor == '='); break;
-			case '~': token.kind = (*lexer->cursor == '=' ? Token_TildeEq   : Token_Tilde);   lexer->cursor += (*lexer->cursor == '='); break;
+			case '@':
+			case '#':
+			case '$':
+			case '?':
+			case ':':
+			case ',':
+			case ';':
+			case '^':
+			case '(':
+			case ')':
+			case '[':
+			case ']':
+			case '{':
+			case '}':
+			{
+				token.kind = c;
+			} break;
 
-			case '=': token.kind = (*lexer->cursor == '=' ? Token_EqEq   : Token_Eq);   lexer->cursor += (*lexer->cursor == '='); break;
-			case '!': token.kind = (*lexer->cursor == '=' ? Token_BangEq : Token_Bang); lexer->cursor += (*lexer->cursor == '='); break;
+			case '*': token.kind = Token_Star    | c1_eq_bit; lexer->cursor += c1_eq; break;
+			case '/': token.kind = Token_Slash   | c1_eq_bit; lexer->cursor += c1_eq; break;
+			case '%': token.kind = Token_Percent | c1_eq_bit; lexer->cursor += c1_eq; break;
+			case '+': token.kind = Token_Plus    | c1_eq_bit; lexer->cursor += c1_eq; break;
+			case '~': token.kind = Token_Tilde   | c1_eq_bit; lexer->cursor += c1_eq; break;
+
+			case '=': token.kind = (*lexer->cursor == '=' ? Token_EqEq   : Token_Eq);   lexer->cursor += c1_eq; break;
+			case '!': token.kind = (*lexer->cursor == '=' ? Token_BangEq : Token_Bang); lexer->cursor += c1_eq; break;
 
 			case '|':
 			{
@@ -231,8 +286,47 @@ Lexer__NextToken(Lexer* lexer)
 
 			default:
 			{
-				//// ERROR
-				NOT_IMPLEMENTED;
+				lexer->cursor -= 1;
+				if (Char_IsDigit(*lexer->cursor))
+				{
+					token = Lexer__ParseNumber(lexer);
+					token.offset = offset;
+				}
+				else if (*lexer->cursor == '"')
+				{
+					String string = Lexer__ParseString(lexer, '"');
+
+					if (string.len > 0xFFFF)
+					{
+						//// ERROR: String literal is too long
+						NOT_IMPLEMENTED;
+					}
+
+					token.kind   = Token_String;
+					token.offset = offset;
+					token.len    = (u16)string.len;
+					token.data   = string.data;
+				}
+				else if (*lexer->cursor == '\'')
+				{
+					String string = Lexer__ParseString(lexer, '\'');
+
+					if (string.len > 0xFFFF)
+					{
+						//// ERROR: Character literal is too long
+						NOT_IMPLEMENTED;
+					}
+
+					token.kind   = Token_Char;
+					token.offset = offset;
+					token.len    = (u16)string.len;
+					token.data   = string.data;
+				}
+				else
+				{
+					//// ERROR
+					NOT_IMPLEMENTED;
+				}
 			} break;
 		}
 	}
@@ -240,6 +334,7 @@ Lexer__NextToken(Lexer* lexer)
 	return token;
 }
 
+__forceinline
 static Token
 Lexer__ParseNumber(Lexer* lexer)
 {
@@ -336,7 +431,7 @@ Lexer__ParseNumber(Lexer* lexer)
 
 		u64 digit_count = (lexer->cursor - start) - underscore_count;
 
-		if (*lexer->cursor == '.' && Char_IsDigit(lexer->cursor[1]) || (*lexer->cursor&0xDF) == 'E')
+		if (*lexer->cursor == '.' && (Char_IsDigit(lexer->cursor[1]) || (*lexer->cursor&0xDF) == 'E'))
 		{
 			NOT_IMPLEMENTED;
 		}
@@ -363,7 +458,7 @@ Lexer__ParseNumber(Lexer* lexer)
 				else break;
 			}
 
-			if (value128.hi != 0)
+			if (overflow || value128.hi != 0)
 			{
 				//// ERROR: does not fit in 64 bits
 				NOT_IMPLEMENTED;
@@ -384,6 +479,7 @@ Lexer__ParseNumber(Lexer* lexer)
 	return token;
 }
 
+__forceinline
 static String
 Lexer__ParseString(Lexer* lexer, u8 terminator)
 {
@@ -567,10 +663,11 @@ LexFile(Virtual_Array* tokens, Virtual_Array* strings, u8* contents, Token** fir
 	bool encountered_errors = false;
 
 	Lexer lexer = {
-		.tokens         = tokens,
-		.strings        = strings,
-		.contents       = contents,
-		.cursor         = contents,
+		.tokens   = tokens,
+		.strings  = strings,
+		.contents = contents,
+		.cursor   = contents,
+		.line     = 1,
 	};
 
 	*first_token = VA_TopPointer(lexer.tokens);

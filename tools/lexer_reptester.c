@@ -136,14 +136,11 @@ wmain(int argc, wchar_t** argv)
 		QueryPerformanceFrequency(&perf_freq);
 
 		Virtual_Array tokens  = VA_Create(sizeof(Token), ~0U - 4096);
-		Virtual_Array idents  = VA_Create(sizeof(u8), ~0U - 4096);
 		Virtual_Array strings = VA_Create(sizeof(u8), ~0U - 4096);
 
 		CommitMemory(tokens.data, tokens.reserved); tokens.committed = tokens.reserved;
-		CommitMemory(idents.data, idents.reserved); idents.committed = idents.reserved;
 		CommitMemory(strings.data, strings.reserved); strings.committed = strings.reserved;
 		memset(tokens.data, '0', tokens.committed);
-		memset(idents.data, '0', idents.committed);
 		memset(strings.data, '0', strings.committed);
 
 		u64 min_dus        = ~0ULL;
@@ -151,19 +148,17 @@ wmain(int argc, wchar_t** argv)
 		f64 max_mlocps     = 0;
 		for (umm i = 0; i < 10; ++i)
 		{
-
 			LARGE_INTEGER start_t;
 			QueryPerformanceCounter(&start_t);
 
 			Token* first_token = 0;
 			u32 token_count    = 0;
-			LexFile(&tokens, &idents, &strings, contents, &first_token, &token_count);
+			LexFile(&tokens, &strings, contents, &first_token, &token_count);
 
 			LARGE_INTEGER end_t;
 			QueryPerformanceCounter(&end_t);
 
-			tokens.offset = 0;
-			idents.offset = 0;
+			tokens.offset  = 0;
 			strings.offset = 0;
 
 			u64 t = end_t.QuadPart - start_t.QuadPart;

@@ -1,7 +1,6 @@
 typedef struct Lexer
 {
 	Virtual_Array* tokens;
-	Virtual_Array* idents;
 	Virtual_Array* strings;
 	u8* contents;
 	u8* cursor;
@@ -596,13 +595,12 @@ Lexer__ParseString(Lexer* lexer, u8 terminator)
 }
 
 static bool
-LexFile(Virtual_Array* tokens, Virtual_Array* idents, Virtual_Array* strings, u8* contents, Token** first_token, u32* token_count)
+LexFile(Virtual_Array* tokens, Virtual_Array* strings, u8* contents, Token** first_token, u32* token_count)
 {
 	bool encountered_errors = false;
 
 	Lexer lexer = {
 		.tokens   = tokens,
-		.idents   = idents,
 		.strings  = strings,
 		.contents = contents,
 		.cursor   = contents,
