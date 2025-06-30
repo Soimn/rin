@@ -12,7 +12,8 @@ if "%Platform%" neq "x64" (
 	goto end
 )
 
-set "common_compile_options= /nologo /W4 /arch:AVX2 /wd4201"
+set "ignored_warnings=/wd4201"
+set "common_compile_options= /nologo /W4 %ignored_warnings% /arch:AVX2"
 set "common_link_options= /incremental:no /opt:ref /subsystem:console"
 
 if "%1"=="debug" (
@@ -27,8 +28,7 @@ if "%1"=="debug" (
 
 if "%2" neq "" goto invalid_arguments
 
-cl %compile_options% ..\tools\create_lexer_test.c /link %link_options% /pdb:create_lexer_test.pdb /out:create_lexer_test.exe
-cl %compile_options% ..\tools\run_lexer_test.c /link %link_options% /pdb:run_lexer_test.pdb /out:run_lexer_test.exe
+cl %compile_options% ..\src\main.c /link %link_options% /pdb:rin.pdb /out:rin.exe
 
 goto end
 
