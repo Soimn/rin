@@ -548,5 +548,4 @@ typedef struct Stats
 {
 	Code_Stats pre_clean;
 	Code_Stats post_clean;
-	u32 file_count;
 } Stats;

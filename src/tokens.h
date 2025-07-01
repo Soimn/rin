@@ -1,7 +1,6 @@
 typedef enum Token_Kind
 {
-	Token_Invalid = 0,
-	Token_EOF,
+	Token_EOF = 0,
 
 	Token_Bang         = '!',
 	Token_Pound        = '#',
@@ -33,31 +32,31 @@ typedef enum Token_Kind
 	Token_CloseBrace   = '}',
 	Token_Tilde        = '~',
 
-	Token_BangEq,
-	Token_PercentEq,
-	Token_StarEq,
-	Token_SlashEq,
-	Token_EqEq,
-	Token_TildeEq,
+	Token_BangEq       = '!' | 0x80,
+	Token_PercentEq    = '%' | 0x80,
+	Token_StarEq       = '*' | 0x80,
+	Token_SlashEq      = '/' | 0x80,
+	Token_EqEq         = '=' | 0x80,
+	Token_TildeEq      = '~' | 0x80,
 
-	Token_AndEq,
-	Token_OrEq,
-	Token_PlusEq,
-	Token_MinusEq,
+	Token_AndEq        = '&' | 0x80,
+	Token_OrEq         = '|' | 0x80,
+	Token_PlusEq       = '+' | 0x80,
+	Token_MinusEq      = '-' | 0x80,
 
-	Token_AndAnd,
-	Token_OrOr,
-	Token_PlusPlus,
-	Token_MinusMinus,
+	Token_AndAnd       = '&' | 0x100,
+	Token_OrOr         = '|' | 0x100,
+	Token_PlusPlus     = '+' | 0x100,
+	Token_MinusMinus   = '-' | 0x100,
 
-	Token_LtEq,
-	Token_GtEq,
+	Token_LtEq         = '<' | 0x80,
+	Token_GtEq         = '>' | 0x80,
 
-	Token_LtLt,
-	Token_GtGt,
+	Token_LtLt         = '<' | 0x100,
+	Token_GtGt         = '>' | 0x100,
 
-	Token_LtLtEq,
-	Token_GtGtEq,
+	Token_LtLtEq       = '<' | 0x180,
+	Token_GtGtEq       = '>' | 0x180,
 
 	Token_Ident,
 	Token_String,
@@ -84,7 +83,6 @@ TokenKind__ToString(Token_Kind kind)
 {
 	switch (kind)
 	{
-		case Token_Invalid:      return STRING("Token_Invalid");      break;
 		case Token_EOF:          return STRING("Token_EOF");          break;
 		case Token_Bang:         return STRING("Token_Bang");         break;
 		case Token_Pound:        return STRING("Token_Pound");        break;

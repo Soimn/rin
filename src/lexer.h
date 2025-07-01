@@ -19,7 +19,7 @@ static Token Lexer__ParseString(Lexer* lexer, u32 offset);
 FORCE_INLINE static Token
 Lexer_NextToken(Lexer* lexer)
 {
-	Token token = { .kind = Token_Invalid };
+	Token token = {0};
 
 	__m256i hex_df       = _mm256_set1_epi8(0xDF);
 	__m256i alpha_bias   = _mm256_set1_epi8(0x7F - 'Z');
@@ -148,100 +148,119 @@ Lexer_NextToken(Lexer* lexer)
 			return token;
 		}
 	}
-	else if (Char_IsDigit(*lexer->cursor))
-	{
-		return Lexer__ParseInt(lexer, offset);
-	}
-	else if (*lexer->cursor == '"' || *lexer->cursor == '\'')
-	{
-		return Lexer__ParseString(lexer, offset);
-	}
 	else
 	{
 		u8 c = *lexer->cursor;
 		++lexer->cursor; // NOTE: valid since the file is padded with zeros
 
-		u8 c1_eq = (lexer->cursor[0] == '=');
-		u8 c1_c  = (lexer->cursor[0] == c);
-		u8 c2_eq = (lexer->cursor[1] == '=');
+		token.kind = c;
 
 		switch (c)
 		{
-			case 0: token.kind = Token_EOF; break;
+			case 0:
+			case '(':
+			case ')':
+			case '[':
+			case ']':
+			case '{':
+			case '}':
+			case '#':
+			case '$':
+			case ',':
+			case ':':
+			case ';':
+			case '?':
+			case '@':
+			case '^':
+			case '.':
+			break;
 
-			case '(':  token.kind = Token_OpenParen;    break;
-			case ')':  token.kind = Token_CloseParen;   break;
-			case '[':  token.kind = Token_OpenBracket;  break;
-			case ']':  token.kind = Token_CloseBracket; break;
-			case '{':  token.kind = Token_OpenBrace;    break;
-			case '}':  token.kind = Token_CloseBrace;   break;
-			case '#':  token.kind = Token_Pound;        break;
-			case '$':  token.kind = Token_Cash;         break;
-			case ',':  token.kind = Token_Comma;        break;
-			case ':':  token.kind = Token_Colon;        break;
-			case ';':  token.kind = Token_Semicolon;    break;
-			case '?':  token.kind = Token_QMark;        break;
-			case '@':  token.kind = Token_At;           break;
-			case '^':  token.kind = Token_Hat;          break;
-			case '.':  token.kind = Token_Dot;          break;
+			case '/':
+			case '!':
+			case '%':
+			case '*':
+			case '=':
+			case '~':
+			{
+#if 1
+				u8 c1_eq = (lexer->cursor[0] == '=');
 
-			#define SINGLE_OR_SINGLE_EQ(SINGLE, SINGLE_EQ)     \
-				{                                                \
-					token.kind     = (c1_eq ? SINGLE_EQ : SINGLE); \
-					lexer->cursor += c1_eq;                        \
+				token.kind    |= (c1_eq << 7);
+				lexer->cursor += c1_eq;
+#else
+				if (lexer->cursor[0] == '=')
+				{
+					token.kind    |= 0x80;
+					lexer->cursor += 1;
 				}
+#endif
+			} break;
 
-			case '/': SINGLE_OR_SINGLE_EQ(Token_Slash,   Token_SlashEq);   break;
-			case '!': SINGLE_OR_SINGLE_EQ(Token_Bang,    Token_BangEq);    break;
-			case '%': SINGLE_OR_SINGLE_EQ(Token_Percent, Token_PercentEq); break;
-			case '*': SINGLE_OR_SINGLE_EQ(Token_Star,    Token_StarEq);    break;
-			case '=': SINGLE_OR_SINGLE_EQ(Token_Eq,      Token_EqEq);      break;
-			case '~': SINGLE_OR_SINGLE_EQ(Token_Tilde,   Token_TildeEq);   break;
-			#undef SINGLE_OR_SINGLE_EQ
+			case '+':
+			case '-':
+			case '&':
+			case '|':
+			{
+#if 1
+				u8 c1_c  = (lexer->cursor[0] == c);
+				u8 c1_eq = (lexer->cursor[0] == '=');
 
-			#define SINGLE_OR_SINGLE_EQ_OR_DOUBLE(SINGLE, SINGLE_EQ, DOUBLE) \
-				{                                                              \
-					if (c1_c)                                                    \
-					{                                                            \
-						token.kind     = DOUBLE;                                   \
-						lexer->cursor += 1;                                        \
-					}                                                            \
-					else                                                         \
-					{                                                            \
-						token.kind     = (c1_eq ? SINGLE_EQ : SINGLE);             \
-						lexer->cursor += c1_eq;                                    \
-					}                                                            \
+				token.kind    |= (c1_c + c1_c + c1_eq) << 7;
+				lexer->cursor += c1_c + c1_eq;
+#else
+				if (lexer->cursor[0] == '=')
+				{
+					token.kind    |= 0x80;
+					lexer->cursor += 1;
 				}
-
-			case '+': SINGLE_OR_SINGLE_EQ_OR_DOUBLE(Token_Plus,  Token_PlusEq,  Token_PlusPlus);   break;
-			case '-': SINGLE_OR_SINGLE_EQ_OR_DOUBLE(Token_Minus, Token_MinusEq, Token_MinusMinus); break;
-			case '&': SINGLE_OR_SINGLE_EQ_OR_DOUBLE(Token_And,   Token_AndEq,   Token_AndAnd);     break;
-			case '|': SINGLE_OR_SINGLE_EQ_OR_DOUBLE(Token_Or,    Token_OrEq,    Token_OrOr);       break;
-			#undef SINGLE_OR_SINGLE_EQ_OR_DOUBLE
-
-			#define SINGLE_OR_SINGLE_EQ_OR_DOUBLE_OR_DOUBLE_EQ(SINGLE, SINGLE_EQ, DOUBLE, DOUBLE_EQ) \
-				{                                                                                      \
-					if (c1_c)                                                                            \
-					{                                                                                    \
-						token.kind     = (c2_eq ? DOUBLE_EQ : DOUBLE);                                     \
-						lexer->cursor += 1 + c2_eq;                                                        \
-					}                                                                                    \
-					else                                                                                 \
-					{                                                                                    \
-						token.kind     = (c1_eq ? SINGLE_EQ : SINGLE);                                     \
-						lexer->cursor += c1_eq;                                                            \
-					}                                                                                    \
+				else if (lexer->cursor[0] == c)
+				{
+					token.kind    |= 0x100;
+					lexer->cursor += 1;
 				}
+#endif
+			} break;
 
-			case '<': SINGLE_OR_SINGLE_EQ_OR_DOUBLE_OR_DOUBLE_EQ(Token_Lt,  Token_LtEq,  Token_LtLt,   Token_LtLtEq);   break;
-			case '>': SINGLE_OR_SINGLE_EQ_OR_DOUBLE_OR_DOUBLE_EQ(Token_Gt,  Token_GtEq,  Token_GtGt,   Token_GtGtEq);   break;
-			#undef SINGLE_OR_SINGLE_EQ_OR_DOUBLE_OR_DOUBLE_EQ
+			case '<':
+			case '>':
+			{
+				if (lexer->cursor[0] == '=')
+				{
+					token.kind    |= 0x80;
+					lexer->cursor += 1;
+				}
+				else if (lexer->cursor[0] == c)
+				{
+					token.kind    |= 0x100;
+					lexer->cursor += 1;
+
+					if (lexer->cursor[0] == '=')
+					{
+						token.kind    |= 0x80;
+						lexer->cursor += 1;
+					}
+				}
+			} break;
+
 
 			// \, ` or >= 0x7E
 			default:
 			{
-				//// ERROR: Unknown symbol
-				NOT_IMPLEMENTED;
+				if (Char_IsDigit(c))
+				{
+					lexer->cursor -= 1;
+					return Lexer__ParseInt(lexer, offset);
+				}
+				else if (c == '"' || c == '\'')
+				{
+					lexer->cursor -= 1;
+					return Lexer__ParseString(lexer, offset);
+				}
+				else
+				{
+					//// ERROR: Unknown symbol
+					NOT_IMPLEMENTED;
+				}
 			} break;
 		}
 	}
@@ -254,7 +273,7 @@ Lexer__ParseInt(Lexer* lexer, u32 offset)
 {
 	ASSERT(Char_IsDigit(*lexer->cursor));
 
-	Token token = { .kind = Token_Invalid, .offset = offset };
+	Token token = { .offset = offset };
 
 	if (lexer->cursor[0] == '0' && (lexer->cursor[1] == 'x' || lexer->cursor[1] == 'h'))
 	{
@@ -460,7 +479,7 @@ Lexer__ParseString(Lexer* lexer, u32 offset)
 {
 	ASSERT(*lexer->cursor == '"' || *lexer->cursor == '\'');
 
-	Token token = { .kind = Token_Invalid, .offset = offset };
+	Token token = { .offset = offset };
 
 	u8 terminator = *lexer->cursor;
 

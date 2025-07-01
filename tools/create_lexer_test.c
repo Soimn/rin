@@ -340,7 +340,7 @@ Clean(u8* contents)
 }
 
 void
-Crawl(Stats* stats, Path_Builder in_path, Path_Builder out_path, u8* file_buffer, u64 file_buffer_size)
+Crawl(Stats* stats, Path_Builder in_path, u8** file_buffer_cursor, u64* file_buffer_space)
 {
 	WIN32_FIND_DATAW find_data;
 	
@@ -362,7 +362,7 @@ Crawl(Stats* stats, Path_Builder in_path, Path_Builder out_path, u8* file_buffer
 			if (find_data.cFileName[0] != L'.')
 			{
 				Path_Marker marker = PathBuilder_Push(&in_path, find_data.cFileName);
-				Crawl(stats, in_path, out_path, file_buffer, file_buffer_size);
+				Crawl(stats, in_path, file_buffer_cursor, file_buffer_space);
 				PathBuilder_PopToMarker(&in_path, marker);
 			}
 		}
@@ -377,7 +377,7 @@ Crawl(Stats* stats, Path_Builder in_path, Path_Builder out_path, u8* file_buffer
 			}
 			else
 			{
-				if ((u64)find_data.nFileSizeLow+1 > file_buffer_size || find_data.nFileSizeHigh != 0)
+				if ((u64)find_data.nFileSizeLow+1 > *file_buffer_space || find_data.nFileSizeHigh != 0)
 				{
 					fwprintf(stderr, L"WARNING: File '%s' is too large.\n", PathBuilder_CurrentPath(&in_path));
 				}
@@ -386,72 +386,30 @@ Crawl(Stats* stats, Path_Builder in_path, Path_Builder out_path, u8* file_buffer
 					u32 file_size = find_data.nFileSizeLow;
 
 					DWORD bytes_read = 0;
-					if (!ReadFile(in_file, file_buffer, file_size, &bytes_read, 0) || bytes_read != file_size)
+					if (!ReadFile(in_file, *file_buffer_cursor, file_size, &bytes_read, 0) || bytes_read != file_size)
 					{
 						fwprintf(stderr, L"WARNING: Failed to read '%s'.\n", PathBuilder_CurrentPath(&in_path));
 					}
 					else
 					{
-						file_buffer[file_size] = 0;
+						(*file_buffer_cursor)[file_size] = 0;
 
-						if ((file_buffer[0] == 0xFF && file_buffer[1] == 0xFE) ||
-								(file_buffer[0] == 0xFE && file_buffer[1] == 0xFF))
+						if (((*file_buffer_cursor)[0] == 0xFF && (*file_buffer_cursor)[1] == 0xFE) ||
+								((*file_buffer_cursor)[0] == 0xFE && (*file_buffer_cursor)[1] == 0xFF))
 						{
 							fwprintf(stderr, L"WARNING: Skipping non UTF-8 file '%s'.\n", PathBuilder_CurrentPath(&in_path));
 						}
 						else
 						{
-							Code_Stats pre_clean = CodeStats_Gather(file_buffer);
-							u32 write_size = Clean(file_buffer);
-							Code_Stats post_clean = CodeStats_Gather(file_buffer);
+							Code_Stats pre_clean = CodeStats_Gather(*file_buffer_cursor);
+							u32 write_size = Clean(*file_buffer_cursor);
+							Code_Stats post_clean = CodeStats_Gather(*file_buffer_cursor);
 
-							if (write_size < 1 << 11)
-							{
-								// Skip
-							}
-							else
-							{
-								wchar_t out_filename[sizeof("0000000000.rlt")] = {
-									L'0' + ((stats->file_count / 1000000000) % 10),
-									L'0' + ((stats->file_count / 100000000)  % 10),
-									L'0' + ((stats->file_count / 10000000)   % 10),
-									L'0' + ((stats->file_count / 1000000)    % 10),
-									L'0' + ((stats->file_count / 100000)     % 10),
-									L'0' + ((stats->file_count / 10000)      % 10),
-									L'0' + ((stats->file_count / 1000)       % 10),
-									L'0' + ((stats->file_count / 100)        % 10),
-									L'0' + ((stats->file_count / 10)         % 10),
-									L'0' + ((stats->file_count / 1)          % 10),
-									L'.', L'r', L'l', L't', 0
-								};
+							*file_buffer_cursor += write_size;
+							*file_buffer_space  -= write_size;
 
-								Path_Marker out_marker = PathBuilder_Push(&out_path, out_filename);
-								HANDLE out_file = CreateFileW(PathBuilder_CurrentPath(&out_path), GENERIC_WRITE, 0, 0, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, 0);
-
-								if (out_file == INVALID_HANDLE_VALUE)
-								{
-									fwprintf(stderr, L"WARNING: Skipping file due to file error '%s'.\n", PathBuilder_CurrentPath(&in_path));
-								}
-								else
-								{
-									DWORD bytes_written = 0;
-									if (!WriteFile(out_file, file_buffer, write_size, &bytes_written, 0) || bytes_written != write_size)
-									{
-										fwprintf(stderr, L"WARNING: Skipping file due to write error '%s'.\n", PathBuilder_CurrentPath(&in_path));
-										DeleteFileW(PathBuilder_CurrentPath(&out_path));
-									}
-									else
-									{
-										++stats->file_count;
-										CodeStats_Combine(&stats->pre_clean, pre_clean);
-										CodeStats_Combine(&stats->post_clean, post_clean);
-									}
-								}
-
-								if (out_file != INVALID_HANDLE_VALUE) CloseHandle(out_file);
-
-								PathBuilder_PopToMarker(&out_path, out_marker);
-							}
+							CodeStats_Combine(&stats->pre_clean, pre_clean);
+							CodeStats_Combine(&stats->post_clean, post_clean);
 						}
 					}
 				}
@@ -482,12 +440,12 @@ wmain(int argc, wchar_t** argv)
 {
 	if (argc != 3)
 	{
-		fwprintf(stderr, L"ERROR: Invalid number of arguments.\nExpected: %s [path to directory of c files] [path to output directory]\n", argv[0]);
+		fwprintf(stderr, L"ERROR: Invalid number of arguments.\nExpected: %s [path to directory of c files] [path to output file]\n", argv[0]);
 		return 1;
 	}
 
-	wchar_t* in_dir  = argv[1];
-	wchar_t* out_dir = argv[2];
+	wchar_t* in_dir   = argv[1];
+	wchar_t* out_path = argv[2];
 
 	if (!PathIsDirectoryW(in_dir))
 	{
@@ -495,31 +453,10 @@ wmain(int argc, wchar_t** argv)
 		return 1;
 	}
 
-	if (!CreateDirectoryW(out_dir, 0))
-	{
-		int error = GetLastError();
-	
-		if (error == ERROR_PATH_NOT_FOUND)
-		{
-			fwprintf(stderr, L"ERROR: This tool is dumb (I am lazy) and cannot create intermediate directories.\nPlease create all intermediate directories in the output directory path :)\nPath provided: '%s'\n", out_dir);
-		}
-		else if (error == ERROR_ALREADY_EXISTS)
-		{
-			fwprintf(stderr, L"ERROR: Output directory already exists.\nPath provided: '%s'\n", out_dir);
-		}
-		else
-		{
-			fwprintf(stderr, L"ERROR: Failed to create the output directory.\nPath provided: '%s'\n", out_dir);
-		}
-
-		return 1;
-	}
-
 	Path_Builder in_path = PathBuilder_Init(2*MAX_PATH);
-	Path_Builder out_path = PathBuilder_Init(2*MAX_PATH);
 
-	u64 file_buffer_size = 1ULL << 32;
-	u8* file_buffer = VirtualAlloc(0, file_buffer_size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+	u64 file_buffer_cap = 1ULL << 32;
+	u8* file_buffer = VirtualAlloc(0, file_buffer_cap, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 
 	if (file_buffer == 0)
 	{
@@ -528,35 +465,45 @@ wmain(int argc, wchar_t** argv)
 	}
 
 	PathBuilder_Push(&in_path, in_dir);
-	PathBuilder_Push(&out_path, out_dir);
 
-	Stats stats = {
+	u8* file_buffer_cursor = file_buffer;
+	u64 file_buffer_space = file_buffer_cap;
+
+	Stats* stats = (Stats*)file_buffer_cursor;
+	*stats = (Stats){
 		.pre_clean  = CodeStats_Init(),
 		.post_clean = CodeStats_Init(),
-		.file_count = 0,
 	};
+	file_buffer_cursor += sizeof(Stats);
+	file_buffer_space  -= sizeof(Stats);
 
-	Crawl(&stats, in_path, out_path, file_buffer, file_buffer_size);
+	Crawl(stats, in_path, &file_buffer_cursor, &file_buffer_space);
 
-	Path_Marker out_marker = PathBuilder_Push(&out_path, L"manifest.rltm");
-	HANDLE manifest_file = CreateFileW(PathBuilder_CurrentPath(&out_path), GENERIC_WRITE, 0, 0, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+	u64 zpad = 65;
+	ASSERT(file_buffer_space >= zpad);
+	file_buffer_cursor += zpad;
+	file_buffer_space  -= zpad;
 
-	if (manifest_file == INVALID_HANDLE_VALUE)
+	HANDLE out_file = CreateFileW(out_path, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+	if (out_file == INVALID_HANDLE_VALUE)
 	{
-		fwprintf(stderr, L"ERROR: Failed to create manifest file '%s'.\n", PathBuilder_CurrentPath(&out_path));
+		fwprintf(stderr, L"ERROR: Failed to create output file at '%s'.\n", out_path);
+		return 1;
 	}
 	else
 	{
+		u64 file_buffer_size = file_buffer_cap - file_buffer_space;
+		ASSERT(file_buffer_size < ~(u32)0);
+
 		DWORD bytes_written = 0;
-		if (!WriteFile(manifest_file, &stats, sizeof(stats), &bytes_written, 0) || bytes_written != sizeof(stats))
+		if (!WriteFile(out_file, file_buffer, (u32)file_buffer_size, &bytes_written, 0) || bytes_written != file_buffer_size)
 		{
-			fprintf(stderr, "ERROR: Failed to write manifest\n");
+			fwprintf(stderr, L"ERROR: Failed to write output file at '%s'.\n", out_path);
+			return 1;
 		}
 
-		CloseHandle(manifest_file);
+		CloseHandle(out_file);
 	}
-
-	PathBuilder_PopToMarker(&out_path, out_marker);
 
 	return 0;
 }

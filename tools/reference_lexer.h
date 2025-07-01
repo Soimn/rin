@@ -17,7 +17,7 @@ RefLexer_Init(u8* contents)
 Token
 RefLexer_NextToken(Ref_Lexer* lexer)
 {
-	Token token = { .kind = Token_Invalid };
+	Token token = {0};
 
 	for (;;)
 	{
