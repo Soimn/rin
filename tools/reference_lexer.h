@@ -1,3 +1,5 @@
+#define REF_LEXER_ZPAD 65
+
 typedef struct Ref_Lexer
 {
 	u8* contents;
@@ -527,4 +529,29 @@ RefLexer_NextToken(Ref_Lexer* lexer)
 	}
 
 	return token;
+}
+
+bool
+RefLexFile(String input, Virtual_Array* tokens, Token** first_token, u32* token_count)
+{
+	ASSERT(input.len > REF_LEXER_ZPAD && IsZeroed(input.data + input.len-REF_LEXER_ZPAD, REF_LEXER_ZPAD));
+
+	VA_EnsureCommitted(tokens, input.len/8);
+
+	Ref_Lexer lexer = RefLexer_Init(input.data);
+
+	*first_token = VA_EndPointer(tokens);
+
+	for (;;)
+	{
+		Token* token = VA_Push(tokens);
+		*token = RefLexer_NextToken(&lexer);
+
+		if (token->kind == Token_EOF) break;
+		else                          continue;
+	}
+
+	*token_count = (u32)((Token*)VA_EndPointer(tokens) - *first_token);
+
+	return true; // TODO: Error reporting
 }

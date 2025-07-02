@@ -38,6 +38,8 @@
 #include <stdint.h>
 
 #include "common.h"
+#include "memory.h"
+#include "virtual_array.h"
 #include "tokens.h"
 #include "lexer.h"
 
