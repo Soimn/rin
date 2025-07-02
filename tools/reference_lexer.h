@@ -66,201 +66,206 @@ RefLexer_NextToken(Ref_Lexer* lexer)
 		token.len  = (u16)len;
 		token.data = start;
 	}
-	else if (Char_IsDigit(*lexer->cursor))
+	else if (lexer->cursor[0] == '0' && (lexer->cursor[1] == 'x' || lexer->cursor[1] == 'h'))
 	{
-		if (lexer->cursor[0] == '0' && (lexer->cursor[1] == 'x' || lexer->cursor[1] == 'h'))
+		bool is_hex_float = (lexer->cursor[1] == 'h');
+
+		lexer->cursor += 2;
+
+		umm digit_count = 0;
+		u64 value = 0;
+
+		for (;;)
 		{
-			bool is_hex_float = (lexer->cursor[1] == 'h');
-
-			lexer->cursor += 2;
-
-			umm digit_count = 0;
-
-			u64 value = 0;
-			for (;;)
+			if (Char_IsDigit(*lexer->cursor))
 			{
-				if (Char_IsDigit(*lexer->cursor))
-				{
-					value <<= 4;
-					value  |= *lexer->cursor & 0xF;
-					++digit_count;
-					++lexer->cursor;
-				}
-				else if (Char_IsHexAlpha(*lexer->cursor))
-				{
-					value <<= 4;
-					value  |= 9 + (*lexer->cursor & 0x1F);
-					++digit_count;
-					++lexer->cursor;
-				}
-				else if (*lexer->cursor == '_')
-				{
-					++lexer->cursor;
-				}
-				else break;
+				value <<= 4;
+				value  |= *lexer->cursor & 0xF;
+				++digit_count;
+				++lexer->cursor;
 			}
-
-			if (is_hex_float)
+			else if (Char_IsHexAlpha(*lexer->cursor))
 			{
-				if (digit_count == 16)
-				{
-					token.kind     = Token_Float;
-					token.floating = (F64_Bits){ .bits = value }.f;
-				}
-				else if (digit_count == 8)
-				{
-					token.kind     = Token_Float;
-					token.floating = (F32_Bits){ .bits = (u32)value }.f;
-				}
-				else
-				{
-					//// ERROR: Hex floats can only have 8 or 16 digits (corresponding to IEE 754 32-bit and 64-bit respectively)
-					NOT_IMPLEMENTED;
-				}
+				value <<= 4;
+				value  |= 9 + (*lexer->cursor & 0x1F);
+				++digit_count;
+				++lexer->cursor;
+			}
+			else if (*lexer->cursor == '_')
+			{
+				++lexer->cursor;
+			}
+			else break;
+		}
+
+		if (is_hex_float)
+		{
+			if (digit_count == 16)
+			{
+				token.kind     = Token_Float;
+				token.floating = (F64_Bits){ .bits = value }.f;
+			}
+			else if (digit_count == 8)
+			{
+				token.kind     = Token_Float;
+				token.floating = (F32_Bits){ .bits = (u32)value }.f;
 			}
 			else
 			{
-				if (digit_count <= 16)
-				{
-					token.kind    = Token_Int;
-					token.integer = value;
-				}
-				else
-				{
-					//// ERROR: Hex int is too large
-					NOT_IMPLEMENTED;
-				}
+				//// ERROR: Hex float can only be 8 or 16 digits long
+				NOT_IMPLEMENTED;
 			}
 		}
 		else
 		{
-			umm digit_count = 0;
-			u64 value = 0;
-
-			u8* start = lexer->cursor;
-
-			for (;;)
+			if (digit_count > 16)
 			{
-				if (Char_IsDigit(*lexer->cursor))
+				//// ERROR: Hex literal too large
+				NOT_IMPLEMENTED;
+			}
+			else
+			{
+				token.kind    = Token_Int;
+				token.integer = value;
+			}
+		}
+	}
+	else if (Char_IsDigit(*lexer->cursor))
+	{
+		umm digit_count = 0;
+		u64 value = 0;
+
+		u8* start = lexer->cursor;
+
+		for (;;)
+		{
+			if (Char_IsDigit(*lexer->cursor))
+			{
+				value = value*10 + (*lexer->cursor&0xF);
+				++digit_count;
+				++lexer->cursor;
+			}
+			else if (*lexer->cursor == '_')
+			{
+				++lexer->cursor;
+			}
+			else break;
+		}
+
+		if (*lexer->cursor == '.' || (*lexer->cursor&0xDF) == 'E')
+		{
+			char buffer[256] = {0};
+			umm buf_cur = 0;
+
+			umm len = lexer->cursor - start;
+			for (umm i = 0; i < len; ++i)
+			{
+				if (start[i] != '_')
 				{
-					value = value*10 + (*lexer->cursor&0xF);
-					++digit_count;
-					++lexer->cursor;
+					ASSERT(buf_cur < ARRAY_LEN(buffer)-1);
+					buffer[buf_cur++] = start[i];
 				}
-				else if (*lexer->cursor == '_')
-				{
-					++lexer->cursor;
-				}
-				else break;
 			}
 
-			if (*lexer->cursor != '.' && (*lexer->cursor&0xDF) != 'E')
+			if (*lexer->cursor == '.')
 			{
-				if (digit_count < 19)
-				{
-					token.kind    = Token_Int;
-					token.integer = value;
-				}
-				else
-				{
-					u64 value_lo = 0;
-					u64 value_hi = 0;
+				ASSERT(buf_cur < ARRAY_LEN(buffer)-1);
+				buffer[buf_cur++] = '.';
+				++lexer->cursor;
 
-					for (u8* scan = start; scan != lexer->cursor; ++scan)
+				umm fraction_digit_count = 0;
+				for (;;)
+				{
+					if (Char_IsDigit(*lexer->cursor))
 					{
-						if (*scan == '_') continue;
+						ASSERT(buf_cur < ARRAY_LEN(buffer)-1);
+						buffer[buf_cur++] = *lexer->cursor;
+						++fraction_digit_count;
+						++lexer->cursor;
+					}
+					else if (*lexer->cursor == '_')
+					{
+						++lexer->cursor;
+					}
+					else break;
+				}
 
-						u64 lo_hi, hi_hi;
-						value_lo = _umul128(value_lo, 10, &lo_hi);
-						value_hi = _umul128(value_hi, 10, &hi_hi);
-						u8 c_out = _addcarry_u64(0, value_hi, lo_hi, &value_hi);
+				if (fraction_digit_count == 0)
+				{
+					//// ERROR: Missing digits
+					NOT_IMPLEMENTED;
+				}
+			}
 
-						if (hi_hi != 0 || c_out != 0)
+			if ((*lexer->cursor&0xDF) == 'E')
+			{
+				ASSERT(buf_cur < ARRAY_LEN(buffer)-1);
+				buffer[buf_cur++] = *lexer->cursor;
+				++lexer->cursor;
+
+				if (*lexer->cursor == '+' || *lexer->cursor == '-')
+				{
+					ASSERT(buf_cur < ARRAY_LEN(buffer)-1);
+					buffer[buf_cur++] = *lexer->cursor;
+					++lexer->cursor;
+				}
+
+				umm exp_digit_count = 0;
+				for (;;)
+				{
+					if (Char_IsDigit(*lexer->cursor))
+					{
+						ASSERT(buf_cur < ARRAY_LEN(buffer)-1);
+						buffer[buf_cur++] = *lexer->cursor;
+						++exp_digit_count;
+						++lexer->cursor;
+					}
+					else if (*lexer->cursor == '_')
+					{
+						++lexer->cursor;
+					}
+					else break;
+				}
+
+				if (exp_digit_count == 0)
+				{
+					//// ERROR: Missing digits
+					NOT_IMPLEMENTED;
+				}
+			}
+
+			token.kind     = Token_Float;
+			token.floating = strtod(buffer, 0);
+		}
+		else
+		{
+			if (digit_count <= 19)
+			{
+				token.kind    = Token_Int;
+				token.integer = value;
+			}
+			else
+			{
+				umm len = lexer->cursor - start;
+				value = 0;
+				for (umm i = 0; i < len; ++i)
+				{
+					if (start[i] != '_')
+					{
+						u64 hi_product;
+						u64 value_x10 = _umul128(value, 10, &hi_product);
+						u8 carry = _addcarry_u64(0, value_x10, start[i]&0xF, &value);
+
+						if (hi_product || carry)
 						{
 							//// ERROR: Overflow
 							NOT_IMPLEMENTED;
 						}
 					}
-
-					if (value_hi == 0)
-					{
-						token.kind    = Token_Int;
-						token.integer = value_lo;
-					}
-					else
-					{
-						NOT_IMPLEMENTED;
-					}
-				}
-			}
-			else
-			{
-				// TODO: actual float parsing
-
-				umm fraction_digit_count = 0;
-				u64 fraction = 0;
-
-				if (*lexer->cursor == '.')
-				{
-					++lexer->cursor;
-
-					for (;;)
-					{
-						if (Char_IsDigit(*lexer->cursor))
-						{
-							fraction = fraction*10 + (*lexer->cursor&0xF);
-							++fraction_digit_count;
-							++lexer->cursor;
-						}
-						else if (*lexer->cursor == '_')
-						{
-							++lexer->cursor;
-						}
-						else break;
-					}
-
-					if (fraction_digit_count == 0)
-					{
-						//// ERROR: Missing digits
-						NOT_IMPLEMENTED;
-					}
 				}
 
-				bool exp_is_minus = false;
-				umm exp_digit_count = 0;
-				u64 exp = 0;
-				if ((*lexer->cursor&0xDF) == 'E')
-				{
-					++lexer->cursor;
-
-					exp_is_minus = (*lexer->cursor == '-');
-					if (*lexer->cursor == '+' || *lexer->cursor == '-') ++lexer->cursor;
-
-					for (;;)
-					{
-						if (Char_IsDigit(*lexer->cursor))
-						{
-							exp = exp*10 + (*lexer->cursor&0xF);
-							++exp_digit_count;
-							++lexer->cursor;
-						}
-						else if (*lexer->cursor == '_')
-						{
-							++lexer->cursor;
-						}
-						else break;
-					}
-
-					if (exp_digit_count == 0)
-					{
-						//// ERROR: Missing digits
-						NOT_IMPLEMENTED;
-					}
-				}
-
-				// TODO: actual float value
-				token.kind = Token_Float;
-				token.floating = (f64)(value + fraction + exp); // bogus to make sure the values are actually produced
+				token.kind    = Token_Int;
+				token.integer = value;
 			}
 		}
 	}
