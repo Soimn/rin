@@ -29,9 +29,13 @@ typedef struct String
 #define STRING(S) ((String){ .data = (u8*)(S), .len = sizeof(S)-1 })
 #define MS_STRING(S) { .data = (u8*)(S), .len = sizeof(S)-1 }
 
+#ifndef DISABLE_ASSERTS
 __declspec(dllimport) int __stdcall IsDebuggerPresent();
 static void AssertionFailed(const char* file, int line, const char* expr);
 #define ASSERT(EX) ((EX) ? 1 : (IsDebuggerPresent() ? (*(volatile int*)0 = 0) : (AssertionFailed(__FILE__, __LINE__, #EX), 0)))
+#else
+#define ASSERT(EX)
+#endif
 
 #define NOT_IMPLEMENTED ASSERT(!"NOT_IMPLEMENTED")
 
