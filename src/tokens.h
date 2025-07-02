@@ -36,13 +36,14 @@ typedef enum Token_Kind
 	Token_PercentEq    = '%' | 0x80,
 	Token_StarEq       = '*' | 0x80,
 	Token_SlashEq      = '/' | 0x80,
-	Token_EqEq         = '=' | 0x80,
 	Token_TildeEq      = '~' | 0x80,
 
 	Token_AndEq        = '&' | 0x80,
 	Token_OrEq         = '|' | 0x80,
 	Token_PlusEq       = '+' | 0x80,
 	Token_MinusEq      = '-' | 0x80,
+
+	Token_EqEq         = '=' | 0x180,
 
 	Token_AndAnd       = '&' | 0x100,
 	Token_OrOr         = '|' | 0x100,

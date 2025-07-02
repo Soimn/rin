@@ -17,6 +17,39 @@ static Token Lexer__ParseHexInt(Lexer* lexer, u32 offset);
 static Token Lexer__ParseInt(Lexer* lexer, u32 offset);
 static Token Lexer__ParseString(Lexer* lexer, u32 offset);
 
+static u8 Lexer__PatternTable[256] = {
+	['#'] = 16,
+	['$'] = 16,
+	['('] = 16,
+	[')'] = 16,
+	[','] = 16,
+	['.'] = 16,
+	[':'] = 16,
+	[';'] = 16,
+	['?'] = 16,
+	['@'] = 16,
+	['['] = 16,
+	[']'] = 16,
+	['^'] = 16,
+	['{'] = 16,
+	['}'] = 16,
+
+	['!'] = 8 | 1,
+	['%'] = 8 | 1,
+	['*'] = 8 | 1,
+	['/'] = 8 | 1,
+	['~'] = 8 | 1,
+
+	['='] = 8 | 1 | 2,
+	['&'] = 8 | 1 | 2,
+	['|'] = 8 | 1 | 2,
+	['+'] = 8 | 1 | 2,
+	['-'] = 8 | 1 | 2,
+
+	['<'] = 8 | 1 | 2 | 4,
+	['>'] = 8 | 1 | 2 | 4,
+};
+
 FORCE_INLINE static Token
 Lexer_NextToken(Lexer* lexer)
 {
@@ -151,89 +184,57 @@ Lexer_NextToken(Lexer* lexer)
 	}
 	else
 	{
-		u8 c = *lexer->cursor;
-		++lexer->cursor; // NOTE: valid since the file is padded with zeros
+		u8 c = lexer->cursor[0];
+		u8 c1_c  = (lexer->cursor[1] == c);
+		u8 c1_eq = (lexer->cursor[1] == '=');
 
-		token.kind = c;
+		token.kind     = c;
+		lexer->cursor += 1;
 
-		switch (c)
+		u8 pattern = Lexer__PatternTable[c];
+		if (pattern < 16)
 		{
-			case 0:
-			case '(':
-			case ')':
-			case '[':
-			case ']':
-			case '{':
-			case '}':
-			case '#':
-			case '$':
-			case ',':
-			case ':':
-			case ';':
-			case '?':
-			case '@':
-			case '^':
-			case '.':
-			break;
-
-			case '/':
-			case '!':
-			case '%':
-			case '*':
-			case '=':
-			case '~':
+			if (pattern != 0)
 			{
-				u8 c1_eq = (lexer->cursor[0] == '=');
+				u8 ext = c1_eq + c1_c + c1_c;
+				u8 resolved_pattern = pattern & ext;
+				u8 advance = (resolved_pattern != 0);
 
-				token.kind    |= (c1_eq << 7);
-				lexer->cursor += c1_eq;
-			} break;
+				token.kind    |= (resolved_pattern << 7);
+				lexer->cursor += advance;
 
-			case '+':
-			case '-':
-			case '&':
-			case '|':
-			case '<':
-			case '>':
-			{
-				u8 c1_c  = (lexer->cursor[0] == c);
-				u8 c1_eq = (lexer->cursor[0] == '=');
-
-				token.kind    |= (c1_c + c1_c + c1_eq) << 7;
-				lexer->cursor += c1_c + c1_eq;
-
-				if ((c == '<' || c == '>') && c1_c && *lexer->cursor == '=')
+				if ((pattern&4) && c1_c && *lexer->cursor == '=')
 				{
 					token.kind    |= 0x80;
 					lexer->cursor += 1;
 				}
-			} break;
-
-
-			// ", ', 0-9, \, ` or >= 0x7E
-			default:
+			}
+			else // ", ', 0-9, \, ` or >= 0x7F
 			{
-				if (c == '0' && (*lexer->cursor == 'x' || *lexer->cursor == 'h'))
+				lexer->cursor -= 1;
+
+				if (lexer->cursor[0] == '0' && (lexer->cursor[1] == 'x' || lexer->cursor[1] == 'h'))
 				{
-					lexer->cursor -= 1;
 					return Lexer__ParseHexInt(lexer, offset);
 				}
-				else if (Char_IsDigit(c))
+				else if (Char_IsDigit(lexer->cursor[0]))
 				{
-					lexer->cursor -= 1;
 					return Lexer__ParseInt(lexer, offset);
 				}
-				else if (c == '"' || c == '\'')
+				else if (lexer->cursor[0] == '"' || lexer->cursor[0] == '\'')
 				{
-					lexer->cursor -= 1;
 					return Lexer__ParseString(lexer, offset);
+				}
+				else if (lexer->cursor[0] == 0)
+				{
+					token.kind = Token_EOF;
 				}
 				else
 				{
 					//// ERROR: Unknown symbol
 					NOT_IMPLEMENTED;
 				}
-			} break;
+			}
 		}
 	}
 
