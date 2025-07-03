@@ -9,6 +9,8 @@ typedef struct Lexer
 static Token
 Lexer__Error(Lexer* lexer, const char* msg, u8* at, u32 line)
 {
+	(void)lexer, (void)msg, (void)at, (void)line;
+
 	// TODO
 	*(volatile int*)0 = 0;
 
@@ -17,12 +19,10 @@ Lexer__Error(Lexer* lexer, const char* msg, u8* at, u32 line)
 	};
 }
 
-static Token
-Lexer__ParseHexInt(Lexer* lexer, u32 offset, u32 line)
+static bool
+Lexer__ParseHexInt(Lexer* lexer, Token* token, u32 line)
 {
 	ASSERT(lexer->cursor[0] == '0' && (lexer->cursor[1] == 'x' || lexer->cursor[1] == 'h'));
-
-	Token token = { .offset = offset };
 
 	u8* start = lexer->cursor;
 
@@ -60,43 +60,43 @@ Lexer__ParseHexInt(Lexer* lexer, u32 offset, u32 line)
 	{
 		if (digit_count == 16)
 		{
-			token.kind     = Token_Float;
-			token.floating = (F64_Bits){ .bits = value }.f;
+			token->kind     = Token_Float;
+			token->floating = (F64_Bits){ .bits = value }.f;
 		}
 		else if (digit_count == 8)
 		{
-			token.kind     = Token_Float;
-			token.floating = (F32_Bits){ .bits = (u32)value }.f;
+			token->kind     = Token_Float;
+			token->floating = (F32_Bits){ .bits = (u32)value }.f;
 		}
 		else
 		{
 			//// ERROR
-			return Lexer__Error(lexer, "Hexadecimal floating point literals can only have 8 or 16 digits (corresponding to IEE 754 32-bit and 64-bit respectively)", start, line);
+			Lexer__Error(lexer, "Hexadecimal floating point literals can only have 8 or 16 digits (corresponding to IEE 754 32-bit and 64-bit respectively)", start, line);
+			return false;
 		}
 	}
 	else
 	{
 		if (digit_count <= 16)
 		{
-			token.kind    = Token_Int;
-			token.integer = value;
+			token->kind    = Token_Int;
+			token->integer = value;
 		}
 		else
 		{
 			//// ERROR
-			return Lexer__Error(lexer, "Hexadecimal integer literal is too large to fit in 64 bits", start, line);
+			Lexer__Error(lexer, "Hexadecimal integer literal is too large to fit in 64 bits", start, line);
+			return false;
 		}
 	}
 
-	return token;
+	return true;
 }
 
-static Token
-Lexer__ParseInt(Lexer* lexer, u32 offset, u32 line)
+static bool
+Lexer__ParseInt(Lexer* lexer, Token* token, u32 line)
 {
 	ASSERT(Char_IsDigit(*lexer->cursor));
-
-	Token token = { .offset = offset };
 
 	umm digit_count = 0;
 	u64 value = 0;
@@ -122,8 +122,8 @@ Lexer__ParseInt(Lexer* lexer, u32 offset, u32 line)
 	{
 		if (digit_count < 19)
 		{
-			token.kind    = Token_Int;
-			token.integer = value;
+			token->kind    = Token_Int;
+			token->integer = value;
 		}
 		else
 		{
@@ -140,12 +140,13 @@ Lexer__ParseInt(Lexer* lexer, u32 offset, u32 line)
 				if (hi_product != 0 || carry != 0)
 				{
 					//// ERROR
-					return Lexer__Error(lexer, "Integer literal is too large to fit in 64 bits", start, line);
+					Lexer__Error(lexer, "Integer literal is too large to fit in 64 bits", start, line);
+					return false;
 				}
 			}
 
-			token.kind    = Token_Int;
-			token.integer = value;
+			token->kind    = Token_Int;
+			token->integer = value;
 		}
 	}
 	else
@@ -188,7 +189,8 @@ Lexer__ParseInt(Lexer* lexer, u32 offset, u32 line)
 			if (fraction_digit_count == 0)
 			{
 				//// ERROR
-				return Lexer__Error(lexer, "Missing digits after decimal point in floating point literal", lexer->cursor, line);
+				Lexer__Error(lexer, "Missing digits after decimal point in floating point literal", lexer->cursor, line);
+				return false;
 			}
 		}
 
@@ -225,23 +227,22 @@ Lexer__ParseInt(Lexer* lexer, u32 offset, u32 line)
 			if (exp_digit_count == 0)
 			{
 				//// ERROR
-				return Lexer__Error(lexer, "Missing digits of exponent in floating point literal", lexer->cursor, line);
+				Lexer__Error(lexer, "Missing digits of exponent in floating point literal", lexer->cursor, line);
+				return false;
 			}
 		}
 
-		token.kind = Token_Float;
-		token.floating = strtod(buffer, 0); // TODO: replace
+		token->kind     = Token_Float;
+		token->floating = strtod(buffer, 0); // TODO: replace
 	}
 
-	return token;
+	return true;
 }
 
-static Token
-Lexer__ParseString(Lexer* lexer, u32 offset, Virtual_Array* string_array, u32 line)
+static bool
+Lexer__ParseString(Lexer* lexer, Token* token, Virtual_Array* string_array, u32 line)
 {
 	ASSERT(*lexer->cursor == '"' || *lexer->cursor == '\'');
-
-	Token token = { .offset = offset };
 
 	u8 terminator = *lexer->cursor;
 
@@ -251,14 +252,15 @@ Lexer__ParseString(Lexer* lexer, u32 offset, Virtual_Array* string_array, u32 li
 	{
 		if (*lexer->cursor == 0 || *lexer->cursor == terminator) break;
 		else if (*lexer->cursor == '\\') lexer->cursor += 2;
-		else                   lexer->cursor += 1;
+		else                             lexer->cursor += 1;
 	}
 	u8* end = lexer->cursor;
 
 	if (*lexer->cursor == 0)
 	{
 		//// ERROR
-		return Lexer__Error(lexer, "Unterminated string literal", start, line);
+		Lexer__Error(lexer, "Unterminated string literal", start, line);
+		return false;
 	}
 	else
 	{
@@ -281,7 +283,8 @@ Lexer__ParseString(Lexer* lexer, u32 offset, Virtual_Array* string_array, u32 li
 			if (raw[i] > 0x7F)
 			{
 				//// ERROR
-				return Lexer__Error(lexer, "Illegal character in string literal", start + i, line);
+				Lexer__Error(lexer, "Illegal character in string literal", start + i, line);
+				return false;
 			}
 			else if (raw[i] != '\\')
 			{
@@ -330,7 +333,8 @@ Lexer__ParseString(Lexer* lexer, u32 offset, Virtual_Array* string_array, u32 li
 							else
 							{
 								//// ERROR
-								return Lexer__Error(lexer, "Missing digits after \\x in byte escape sequence", esc_start, line); 
+								Lexer__Error(lexer, "Missing digits after \\x in byte escape sequence", esc_start, line); 
+								return false;
 							}
 						}
 
@@ -357,7 +361,8 @@ Lexer__ParseString(Lexer* lexer, u32 offset, Virtual_Array* string_array, u32 li
 							else
 							{
 								//// ERROR
-								return Lexer__Error(lexer, "Missing digits after \\U in unicode escape sequence", esc_start, line);
+								Lexer__Error(lexer, "Missing digits after \\U in unicode escape sequence", esc_start, line);
+								return false;
 							}
 						}
 
@@ -386,14 +391,16 @@ Lexer__ParseString(Lexer* lexer, u32 offset, Virtual_Array* string_array, u32 li
 						else
 						{
 							//// ERROR
-							return Lexer__Error(lexer, "Unicode codepoint is outside of UTF-8 range", esc_start, line);
+							Lexer__Error(lexer, "Unicode codepoint is outside of UTF-8 range", esc_start, line);
+							return false;
 						}
 					} break;
 
 					default:
 					{
 						//// ERROR
-						return Lexer__Error(lexer, "Illegal escape sequence", esc_start, line);
+						Lexer__Error(lexer, "Illegal escape sequence", esc_start, line);
+						return false;
 					} break;
 				}
 			}
@@ -402,15 +409,16 @@ Lexer__ParseString(Lexer* lexer, u32 offset, Virtual_Array* string_array, u32 li
 		if (string.len > ~(u16)0)
 		{
 			//// ERROR
-			return Lexer__Error(lexer, "String is too long", start, line);
+			Lexer__Error(lexer, "String is too long", start, line);
+			return false;
 		}
 
-		token.kind = (terminator == '"' ? Token_String : Token_Char);
-		token.len  = (u16)string.len;
-		token.data = string.data;
+		token->kind = (terminator == '"' ? Token_String : Token_Char);
+		token->len  = (u16)string.len;
+		token->data = string.data;
 	}
 
-	return token;
+	return true;
 }
 
 static bool
@@ -480,8 +488,8 @@ LexFile(String input, Virtual_Array* tokens, Virtual_Array* string_array, Token*
 						if (_mm256_testz_si256(c, c))
 						{
 							//// ERROR
-							*token = Lexer__Error(&lexer, "Unterminated block comment", start, start_line);
-							break;
+							Lexer__Error(&lexer, "Unterminated block comment", start, start_line);
+							return false;
 						}
 						else
 						{
@@ -519,8 +527,6 @@ LexFile(String input, Virtual_Array* tokens, Virtual_Array* string_array, Token*
 			}
 			else break;
 		}
-
-		if (token->kind == Token_Error) break;
 
 		u32 offset = (u32)(lexer.cursor - input.data);
 		token->offset = offset;
@@ -573,7 +579,8 @@ LexFile(String input, Virtual_Array* tokens, Virtual_Array* string_array, Token*
 				if (len > ~(u16)0)
 				{
 					//// ERROR
-					*token = Lexer__Error(&lexer, "Identifier is too long", start, start_line);
+					Lexer__Error(&lexer, "Identifier is too long", start, start_line);
+					return false;
 				}
 				else
 				{
@@ -649,34 +656,45 @@ LexFile(String input, Virtual_Array* tokens, Virtual_Array* string_array, Token*
 
 					if (lexer.cursor[0] == '0' && (lexer.cursor[1] == 'x' || lexer.cursor[1] == 'h'))
 					{
-						*token = Lexer__ParseHexInt(&lexer, offset, line);
+						if (!Lexer__ParseHexInt(&lexer, token, line))
+						{
+							//// ERROR
+							return false;
+						}
 					}
 					else if (Char_IsDigit(lexer.cursor[0]))
 					{
-						*token = Lexer__ParseInt(&lexer, offset, line);
+						if (!Lexer__ParseInt(&lexer, token, line))
+						{
+							//// ERROR
+							return false;
+						}
 					}
 					else if (lexer.cursor[0] == '"' || lexer.cursor[0] == '\'')
 					{
-						*token = Lexer__ParseString(&lexer, offset, string_array, line);
+						if (!Lexer__ParseString(&lexer, token, string_array, line))
+						{
+							//// ERROR
+							return false;
+						}
 					}
 					else if (lexer.cursor[0] == 0)
 					{
 						token->kind = Token_EOF;
+						break;
 					}
 					else
 					{
 						//// ERROR
-						*token = Lexer__Error(&lexer, "Unknown symbol", lexer.cursor, line);
+						Lexer__Error(&lexer, "Unknown symbol", lexer.cursor, line);
+						return false;
 					}
 				}
 			}
 		}
-
-		if (token->kind == Token_EOF || token->kind == Token_Error) break;
-		else                                                        continue;
 	}
 
 	*token_count = (u32)((Token*)VA_EndPointer(tokens) - *first_token);
 
-	return ((*first_token)[*token_count-1].kind != Token_Error);
+	return true;
 }
