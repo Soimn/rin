@@ -1,6 +1,7 @@
 typedef enum Token_Kind
 {
-	Token_EOF = 0,
+	Token_EOF   = 0,
+	Token_Error = 0xFFFF,
 
 	Token_Bang         = '!',
 	Token_Pound        = '#',

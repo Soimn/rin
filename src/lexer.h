@@ -1,74 +1,57 @@
 #define LEXER_ZPAD 65
 
-static s8 Lexer__PatternTable[256] = {
-	['#'] = -1,
-	['$'] = -1,
-	['('] = -1,
-	[')'] = -1,
-	[','] = -1,
-	['.'] = -1,
-	[':'] = -1,
-	[';'] = -1,
-	['?'] = -1,
-	['@'] = -1,
-	['['] = -1,
-	[']'] = -1,
-	['^'] = -1,
-	['{'] = -1,
-	['}'] = -1,
-
-	['!'] = 1,
-	['%'] = 1,
-	['*'] = 1,
-	['/'] = 1,
-	['~'] = 1,
-
-	['='] = 1 | 2,
-	['&'] = 1 | 2,
-	['|'] = 1 | 2,
-	['+'] = 1 | 2,
-	['-'] = 1 | 2,
-
-	['<'] = 1 | 2 | 4,
-	['>'] = 1 | 2 | 4,
-};
+typedef struct Lexer
+{
+	u8* cursor;
+	u8* contents;
+} Lexer;
 
 static Token
-Lexer__ParseHexInt(u8** cursor, u32 offset)
+Lexer__Error(Lexer* lexer, const char* msg, u8* at, u32 line)
 {
+	// TODO
+	*(volatile int*)0 = 0;
+
+	return (Token){
+		.kind = Token_Error,
+	};
+}
+
+static Token
+Lexer__ParseHexInt(Lexer* lexer, u32 offset, u32 line)
+{
+	ASSERT(lexer->cursor[0] == '0' && (lexer->cursor[1] == 'x' || lexer->cursor[1] == 'h'));
+
 	Token token = { .offset = offset };
 
-	// NOTE: this is to make MSVC happy so that it actually keeps the cursor in a register
-	u8* cur = *cursor;
+	u8* start = lexer->cursor;
 
-	ASSERT(cur[0] == '0' && (cur[1] == 'x' || cur[1] == 'h'));
+	bool is_hex_float = (lexer->cursor[1] == 'h');
 
-	bool is_hex_float = (cur[1] == 'h');
-
-	cur += 2;
+	lexer->cursor += 2;
 
 	umm digit_count = 0;
 
 	u64 value = 0;
 	for (;;)
 	{
-		if (Char_IsDigit(*cur))
+		if (Char_IsDigit(*lexer->cursor))
 		{
 			value <<= 4;
-			value  |= *cur & 0xF;
+			value  |= *lexer->cursor & 0xF;
 			++digit_count;
-			++cur;
+			++lexer->cursor;
 		}
-		else if (Char_IsHexAlpha(*cur))
+		else if (Char_IsHexAlpha(*lexer->cursor))
 		{
 			value <<= 4;
-			value  |= 9 + (*cur & 0x1F);
+			value  |= 9 + (*lexer->cursor & 0x1F);
 			++digit_count;
-			++cur;
+			++lexer->cursor;
 		}
-		else if (*cur == '_')
+		else if (*lexer->cursor == '_')
 		{
-			++cur;
+			++lexer->cursor;
 		}
 		else break;
 	}
@@ -87,8 +70,8 @@ Lexer__ParseHexInt(u8** cursor, u32 offset)
 		}
 		else
 		{
-			//// ERROR: Hex floats can only have 8 or 16 digits (corresponding to IEE 754 32-bit and 64-bit respectively)
-			NOT_IMPLEMENTED;
+			//// ERROR
+			return Lexer__Error(lexer, "Hexadecimal floating point literals can only have 8 or 16 digits (corresponding to IEE 754 32-bit and 64-bit respectively)", start, line);
 		}
 	}
 	else
@@ -100,46 +83,42 @@ Lexer__ParseHexInt(u8** cursor, u32 offset)
 		}
 		else
 		{
-			//// ERROR: Hex int is too large
-			NOT_IMPLEMENTED;
+			//// ERROR
+			return Lexer__Error(lexer, "Hexadecimal integer literal is too large to fit in 64 bits", start, line);
 		}
 	}
 
-	*cursor = cur;
 	return token;
 }
 
 static Token
-Lexer__ParseInt(u8** cursor, u32 offset)
+Lexer__ParseInt(Lexer* lexer, u32 offset, u32 line)
 {
-	// NOTE: this is to make MSVC happy so that it actually keeps the cursor in a register
-	u8* cur = *cursor;
-
-	ASSERT(Char_IsDigit(*cur));
+	ASSERT(Char_IsDigit(*lexer->cursor));
 
 	Token token = { .offset = offset };
 
 	umm digit_count = 0;
 	u64 value = 0;
 
-	u8* start = cur;
+	u8* start = lexer->cursor;
 
 	for (;;)
 	{
-		if (Char_IsDigit(*cur))
+		if (Char_IsDigit(*lexer->cursor))
 		{
-			value = value*10 + (*cur&0xF);
+			value = value*10 + (*lexer->cursor&0xF);
 			++digit_count;
-			++cur;
+			++lexer->cursor;
 		}
-		else if (*cur == '_')
+		else if (*lexer->cursor == '_')
 		{
-			++cur;
+			++lexer->cursor;
 		}
 		else break;
 	}
 
-	if (*cur != '.' && (*cur&0xDF) != 'E')
+	if (*lexer->cursor != '.' && (*lexer->cursor&0xDF) != 'E')
 	{
 		if (digit_count < 19)
 		{
@@ -150,7 +129,7 @@ Lexer__ParseInt(u8** cursor, u32 offset)
 		{
 			value = 0;
 
-			for (u8* scan = start; scan != cur; ++scan)
+			for (u8* scan = start; scan != lexer->cursor; ++scan)
 			{
 				if (*scan == '_') continue;
 
@@ -160,8 +139,8 @@ Lexer__ParseInt(u8** cursor, u32 offset)
 
 				if (hi_product != 0 || carry != 0)
 				{
-					//// ERROR: Overflow
-					NOT_IMPLEMENTED;
+					//// ERROR
+					return Lexer__Error(lexer, "Integer literal is too large to fit in 64 bits", start, line);
 				}
 			}
 
@@ -174,7 +153,7 @@ Lexer__ParseInt(u8** cursor, u32 offset)
 		char buffer[128] = {0};
 		umm buf_cur = 0;
 
-		for (u8* scan = start; scan < cur; ++scan)
+		for (u8* scan = start; scan < lexer->cursor; ++scan)
 		{
 			if (*scan != '_')
 			{
@@ -183,70 +162,70 @@ Lexer__ParseInt(u8** cursor, u32 offset)
 			}
 		}
 
-		if (*cur == '.')
+		if (*lexer->cursor == '.')
 		{
 			ASSERT(buf_cur < ARRAY_LEN(buffer)-1);
 			buffer[buf_cur++] = '.';
-			++cur;
+			++lexer->cursor;
 
 			umm fraction_digit_count = 0;
 			for (;;)
 			{
-				if (Char_IsDigit(*cur))
+				if (Char_IsDigit(*lexer->cursor))
 				{
 					ASSERT(buf_cur < ARRAY_LEN(buffer)-1);
-					buffer[buf_cur++] = *cur;
+					buffer[buf_cur++] = *lexer->cursor;
 					++fraction_digit_count;
-					++cur;
+					++lexer->cursor;
 				}
-				else if (*cur == '_')
+				else if (*lexer->cursor == '_')
 				{
-					++cur;
+					++lexer->cursor;
 				}
 				else break;
 			}
 
 			if (fraction_digit_count == 0)
 			{
-				//// ERROR: Missing digits
-				NOT_IMPLEMENTED;
+				//// ERROR
+				return Lexer__Error(lexer, "Missing digits after decimal point in floating point literal", lexer->cursor, line);
 			}
 		}
 
-		if ((*cur&0xDF) == 'E')
+		if ((*lexer->cursor&0xDF) == 'E')
 		{
 			ASSERT(buf_cur < ARRAY_LEN(buffer)-1);
-			buffer[buf_cur++] = *cur;
-			++cur;
+			buffer[buf_cur++] = *lexer->cursor;
+			++lexer->cursor;
 
-			if (*cur == '+' || *cur == '-')
+			if (*lexer->cursor == '+' || *lexer->cursor == '-')
 			{
 				ASSERT(buf_cur < ARRAY_LEN(buffer)-1);
-				buffer[buf_cur++] = *cur;
-				++cur;
+				buffer[buf_cur++] = *lexer->cursor;
+				++lexer->cursor;
 			}
 
 			umm exp_digit_count = 0;
 			for (;;)
 			{
-				if (Char_IsDigit(*cur))
+				if (Char_IsDigit(*lexer->cursor))
 				{
 					ASSERT(buf_cur < ARRAY_LEN(buffer)-1);
-					buffer[buf_cur++] = *cur;
+					buffer[buf_cur++] = *lexer->cursor;
 					++exp_digit_count;
-					++cur;
+					++lexer->cursor;
 				}
-				else if (*cur == '_')
+				else if (*lexer->cursor == '_')
 				{
-					++cur;
+					++lexer->cursor;
 				}
 				else break;
 			}
 
 			if (exp_digit_count == 0)
 			{
-				//// ERROR: Missing digits
-				NOT_IMPLEMENTED;
+				//// ERROR
+				return Lexer__Error(lexer, "Missing digits of exponent in floating point literal", lexer->cursor, line);
 			}
 		}
 
@@ -254,40 +233,36 @@ Lexer__ParseInt(u8** cursor, u32 offset)
 		token.floating = strtod(buffer, 0); // TODO: replace
 	}
 
-	*cursor = cur;
 	return token;
 }
 
 static Token
-Lexer__ParseString(u8** cursor, u32 offset, Virtual_Array* string_array)
+Lexer__ParseString(Lexer* lexer, u32 offset, Virtual_Array* string_array, u32 line)
 {
-	// NOTE: this is to make MSVC happy so that it actually keeps the cursor in a register
-	u8* cur = *cursor;
-
-	ASSERT(*cur == '"' || *cur == '\'');
+	ASSERT(*lexer->cursor == '"' || *lexer->cursor == '\'');
 
 	Token token = { .offset = offset };
 
-	u8 terminator = *cur;
+	u8 terminator = *lexer->cursor;
 
-	++cur;
-	u8* start = cur;
+	++lexer->cursor;
+	u8* start = lexer->cursor;
 	for (;;)
 	{
-		if (*cur == 0 || *cur == terminator) break;
-		else if (*cur == '\\') cur += 2;
-		else                   cur += 1;
+		if (*lexer->cursor == 0 || *lexer->cursor == terminator) break;
+		else if (*lexer->cursor == '\\') lexer->cursor += 2;
+		else                   lexer->cursor += 1;
 	}
-	u8* end = cur;
+	u8* end = lexer->cursor;
 
-	if (*cur == 0)
+	if (*lexer->cursor == 0)
 	{
-		//// ERROR: Unterminated string literal
-		NOT_IMPLEMENTED;
+		//// ERROR
+		return Lexer__Error(lexer, "Unterminated string literal", start, line);
 	}
 	else
 	{
-		++cur; // NOTE: Skip terminator
+		++lexer->cursor; // NOTE: Skip terminator
 
 		ASSERT(end - start < ~(u32)0);
 
@@ -305,8 +280,8 @@ Lexer__ParseString(u8** cursor, u32 offset, Virtual_Array* string_array)
 		{
 			if (raw[i] > 0x7F)
 			{
-				//// ERROR: Illegal shit in string literal
-				NOT_IMPLEMENTED;
+				//// ERROR
+				return Lexer__Error(lexer, "Illegal character in string literal", start + i, line);
 			}
 			else if (raw[i] != '\\')
 			{
@@ -314,6 +289,8 @@ Lexer__ParseString(u8** cursor, u32 offset, Virtual_Array* string_array)
 			}
 			else
 			{
+				u8* esc_start = raw;
+
 				u8 esc = raw[i+1];
 
 				ASSERT(i+1 < cap);
@@ -352,8 +329,8 @@ Lexer__ParseString(u8** cursor, u32 offset, Virtual_Array* string_array)
 							}
 							else
 							{
-								//// ERROR: Missing digits in \x
-								NOT_IMPLEMENTED;
+								//// ERROR
+								return Lexer__Error(lexer, "Missing digits after \\x in byte escape sequence", esc_start, line); 
 							}
 						}
 
@@ -379,8 +356,8 @@ Lexer__ParseString(u8** cursor, u32 offset, Virtual_Array* string_array)
 							}
 							else
 							{
-								//// ERROR: Missing digits in \u
-								NOT_IMPLEMENTED;
+								//// ERROR
+								return Lexer__Error(lexer, "Missing digits after \\U in unicode escape sequence", esc_start, line);
 							}
 						}
 
@@ -409,16 +386,14 @@ Lexer__ParseString(u8** cursor, u32 offset, Virtual_Array* string_array)
 						else
 						{
 							//// ERROR
-							Lexer__Error("Unicode codepoint is outside of UTF-8 range", , line);
-							NOT_IMPLEMENTED;
+							return Lexer__Error(lexer, "Unicode codepoint is outside of UTF-8 range", esc_start, line);
 						}
 					} break;
 
 					default:
 					{
 						//// ERROR
-						Lexer__Error("Illegal escape sequence", , line);
-						NOT_IMPLEMENTED;
+						return Lexer__Error(lexer, "Illegal escape sequence", esc_start, line);
 					} break;
 				}
 			}
@@ -427,8 +402,7 @@ Lexer__ParseString(u8** cursor, u32 offset, Virtual_Array* string_array)
 		if (string.len > ~(u16)0)
 		{
 			//// ERROR
-			Lexer__Error("String is too long", start, line);
-			NOT_IMPLEMENTED;
+			return Lexer__Error(lexer, "String is too long", start, line);
 		}
 
 		token.kind = (terminator == '"' ? Token_String : Token_Char);
@@ -436,7 +410,6 @@ Lexer__ParseString(u8** cursor, u32 offset, Virtual_Array* string_array)
 		token.data = string.data;
 	}
 
-	*cursor = cur;
 	return token;
 }
 
@@ -448,6 +421,11 @@ LexFile(String input, Virtual_Array* tokens, Virtual_Array* string_array, Token*
 	VA_EnsureCommitted(tokens, input.len/8);
 
 	*first_token = VA_EndPointer(tokens);
+
+	Lexer lexer = {
+		.cursor   = input.data,
+		.contents = input.data,
+	};
 
 	__m256i hex_df       = _mm256_set1_epi8(0xDF);
 	__m256i alpha_bias   = _mm256_set1_epi8(0x7F - 'Z');
@@ -461,29 +439,29 @@ LexFile(String input, Virtual_Array* tokens, Virtual_Array* string_array, Token*
 
 	u32 line = 1;
 
-	for (u8* cursor = input.data;;)
+	for (;;)
 	{
 		Token* token = VA_Push(tokens);
 
 		for (;;)
 		{
-			while ((u8)(*cursor-1) < (u8)0x20)
+			while ((u8)(*lexer.cursor-1) < (u8)0x20)
 			{
-				line += (*cursor == '\n');
-				++cursor;
+				line += (*lexer.cursor == '\n');
+				++lexer.cursor;
 			}
 
-			if (cursor[0] == '/' && cursor[1] == '*')
+			if (lexer.cursor[0] == '/' && lexer.cursor[1] == '*')
 			{
-				u8* start      = cursor;
+				u8* start      = lexer.cursor;
 				u32 start_line = line;
 
-				cursor += 2;
+				lexer.cursor += 2;
 
 				unsigned long skip;
 				for (;;)
 				{
-					__m256i c = _mm256_loadu_si256((__m256i*)cursor);
+					__m256i c = _mm256_loadu_si256((__m256i*)lexer.cursor);
 
 					u32 slash_mask   = _mm256_movemask_epi8(_mm256_cmpeq_epi8(c, slash));
 					u32 star_mask    = _mm256_movemask_epi8(_mm256_cmpeq_epi8(c, star));
@@ -494,7 +472,7 @@ LexFile(String input, Virtual_Array* tokens, Virtual_Array* string_array, Token*
 					if (_BitScanForward(&skip, mask))
 					{
 						line += _mm_popcnt_u32(newline_mask & ((1 << skip) - 1));
-						cursor += skip + 1;
+						lexer.cursor += skip + 1;
 						break;
 					}
 					else
@@ -502,24 +480,26 @@ LexFile(String input, Virtual_Array* tokens, Virtual_Array* string_array, Token*
 						if (_mm256_testz_si256(c, c))
 						{
 							//// ERROR
-							*token = Lexer__Error("Unterminated block comment", start, start_line);
-							NOT_IMPLEMENTED; // TODO: How to bail?
+							*token = Lexer__Error(&lexer, "Unterminated block comment", start, start_line);
+							break;
 						}
 						else
 						{
 							line += _mm_popcnt_u32(newline_mask & 0x7FFFFFFF);
 
-							cursor += 31; // there might be a * at the end, so only skip 31
+							lexer.cursor += 31; // there might be a * at the end, so only skip 31
 							continue;
 						}
 					}
 				}
+
+				if (token->kind == Token_Error) break;
 			}
-			else if (cursor[0] == '/' && cursor[1] == '/')
+			else if (lexer.cursor[0] == '/' && lexer.cursor[1] == '/')
 			{
 				for (;;)
 				{
-					__m256i c = _mm256_loadu_si256((__m256i*)cursor);
+					__m256i c = _mm256_loadu_si256((__m256i*)lexer.cursor);
 					if (_mm256_testz_si256(c, c)) break;
 
 					u32 newline_mask = _mm256_movemask_epi8(_mm256_cmpeq_epi8(c, newline));
@@ -527,12 +507,12 @@ LexFile(String input, Virtual_Array* tokens, Virtual_Array* string_array, Token*
 					unsigned long skip;
 					if (_BitScanForward(&skip, newline_mask))
 					{
-						cursor += skip;
+						lexer.cursor += skip;
 						break;
 					}
 					else
 					{
-						cursor += 32;
+						lexer.cursor += 32;
 						continue;
 					}
 				}
@@ -540,12 +520,14 @@ LexFile(String input, Virtual_Array* tokens, Virtual_Array* string_array, Token*
 			else break;
 		}
 
-		u32 offset = (u32)(cursor - input.data);
+		if (token->kind == Token_Error) break;
+
+		u32 offset = (u32)(lexer.cursor - input.data);
 		token->offset = offset;
 
-		if (Char_IsAlpha(*cursor) || *cursor == '_')
+		if (Char_IsAlpha(*lexer.cursor) || *lexer.cursor == '_')
 		{
-			__m256i c256 = _mm256_loadu_si256((__m256i*)cursor);
+			__m256i c256 = _mm256_loadu_si256((__m256i*)lexer.cursor);
 			__m256i alpha = _mm256_cmpgt_epi8(_mm256_add_epi8(_mm256_and_si256(c256, hex_df), alpha_bias), alpha_thresh);
 			__m256i digit = _mm256_cmpgt_epi8(_mm256_add_epi8(c256, digit_bias), digit_thresh);
 			__m256i under = _mm256_cmpeq_epi8(c256, underscore);
@@ -557,17 +539,17 @@ LexFile(String input, Virtual_Array* tokens, Virtual_Array* string_array, Token*
 			{
 				token->kind = Token_Ident;
 				token->len  = (u16)ident_skip;
-				token->data = cursor;
-				cursor += ident_skip;
+				token->data = lexer.cursor;
+				lexer.cursor += ident_skip;
 			}
 			else
 			{
-				u8* start      = cursor;
+				u8* start      = lexer.cursor;
 				u32 start_line = line;
 
 				for (;;)
 				{
-					c256 = _mm256_loadu_si256((__m256i*)cursor);
+					c256 = _mm256_loadu_si256((__m256i*)lexer.cursor);
 					alpha = _mm256_cmpgt_epi8(_mm256_add_epi8(_mm256_and_si256(c256, hex_df), alpha_bias), alpha_thresh);
 					digit = _mm256_cmpgt_epi8(_mm256_add_epi8(c256, digit_bias), digit_thresh);
 					under = _mm256_cmpeq_epi8(c256, underscore);
@@ -577,22 +559,21 @@ LexFile(String input, Virtual_Array* tokens, Virtual_Array* string_array, Token*
 					if (ident_mask == 0) break;
 					else if (_BitScanForward(&ident_skip, ident_mask+1))
 					{
-						cursor += ident_skip;
+						lexer.cursor += ident_skip;
 						break;
 					}
 					else
 					{
-						cursor += 32;
+						lexer.cursor += 32;
 						continue;
 					}
 				}
 
-				u64 len = cursor - start;
+				u64 len = lexer.cursor - start;
 				if (len > ~(u16)0)
 				{
 					//// ERROR
-					*token = Lexer__Error("Identifier is too long", start, start_line);
-					NOT_IMPLEMENTED; // TODO: How to bail?
+					*token = Lexer__Error(&lexer, "Identifier is too long", start, start_line);
 				}
 				else
 				{
@@ -604,14 +585,47 @@ LexFile(String input, Virtual_Array* tokens, Virtual_Array* string_array, Token*
 		}
 		else
 		{
-			u8 c = cursor[0];
+			static s8 Lexer__PatternTable[256] = {
+				['#'] = -1,
+				['$'] = -1,
+				['('] = -1,
+				[')'] = -1,
+				[','] = -1,
+				['.'] = -1,
+				[':'] = -1,
+				[';'] = -1,
+				['?'] = -1,
+				['@'] = -1,
+				['['] = -1,
+				[']'] = -1,
+				['^'] = -1,
+				['{'] = -1,
+				['}'] = -1,
+
+				['!'] = 1,
+				['%'] = 1,
+				['*'] = 1,
+				['/'] = 1,
+				['~'] = 1,
+
+				['='] = 1 | 2,
+				['&'] = 1 | 2,
+				['|'] = 1 | 2,
+				['+'] = 1 | 2,
+				['-'] = 1 | 2,
+
+				['<'] = 1 | 2 | 4,
+				['>'] = 1 | 2 | 4,
+			};
+
+			u8 c = lexer.cursor[0];
 			s8 pattern = Lexer__PatternTable[c];
 
-			u8 c1_c  = (cursor[1] == c);
-			u8 c1_eq = (cursor[1] == '=');
+			u8 c1_c  = (lexer.cursor[1] == c);
+			u8 c1_eq = (lexer.cursor[1] == '=');
 
 			token->kind = c;
-			cursor     += 1;
+			lexer.cursor += 1;
 
 			if (pattern >= 0)
 			{
@@ -620,50 +634,49 @@ LexFile(String input, Virtual_Array* tokens, Virtual_Array* string_array, Token*
 					u8 ext = c1_eq + c1_c + c1_c;
 					u8 resolved_pattern = pattern & ext;
 
-					token->kind |= (resolved_pattern << 7);
-					cursor      += (resolved_pattern != 0);
+					token->kind  |= (resolved_pattern << 7);
+					lexer.cursor += (resolved_pattern != 0);
 
-					if ((pattern&4) && c1_c && *cursor == '=')
+					if ((pattern&4) && c1_c && *lexer.cursor == '=')
 					{
-						token->kind |= 0x80;
-						cursor      += 1;
+						token->kind  |= 0x80;
+						lexer.cursor += 1;
 					}
 				}
 				else // ", ', 0-9, \, ` or >= 0x7F
 				{
-					cursor -= 1;
+					lexer.cursor -= 1;
 
-					if (cursor[0] == '0' && (cursor[1] == 'x' || cursor[1] == 'h'))
+					if (lexer.cursor[0] == '0' && (lexer.cursor[1] == 'x' || lexer.cursor[1] == 'h'))
 					{
-						*token = Lexer__ParseHexInt(&cursor, offset, line);
+						*token = Lexer__ParseHexInt(&lexer, offset, line);
 					}
-					else if (Char_IsDigit(cursor[0]))
+					else if (Char_IsDigit(lexer.cursor[0]))
 					{
-						*token = Lexer__ParseInt(&cursor, offset, line);
+						*token = Lexer__ParseInt(&lexer, offset, line);
 					}
-					else if (cursor[0] == '"' || cursor[0] == '\'')
+					else if (lexer.cursor[0] == '"' || lexer.cursor[0] == '\'')
 					{
-						*token = Lexer__ParseString(&cursor, offset, string_array, line);
+						*token = Lexer__ParseString(&lexer, offset, string_array, line);
 					}
-					else if (cursor[0] == 0)
+					else if (lexer.cursor[0] == 0)
 					{
 						token->kind = Token_EOF;
 					}
 					else
 					{
 						//// ERROR
-						*token = Lexer__Error("Unknown symbol", cursor, line);
-						NOT_IMPLEMENTED;
+						*token = Lexer__Error(&lexer, "Unknown symbol", lexer.cursor, line);
 					}
 				}
 			}
 		}
 
-		if (token->kind == Token_EOF) break;
-		else                          continue;
+		if (token->kind == Token_EOF || token->kind == Token_Error) break;
+		else                                                        continue;
 	}
 
 	*token_count = (u32)((Token*)VA_EndPointer(tokens) - *first_token);
 
-	return true; // TODO: Error handling
+	return ((*first_token)[*token_count-1].kind != Token_Error);
 }
