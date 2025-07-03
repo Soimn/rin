@@ -421,6 +421,76 @@ Lexer__ParseString(Lexer* lexer, Token* token, Virtual_Array* string_array, u32 
 	return true;
 }
 
+FORCE_INLINE static bool
+Lexer__SkipBlockComment(Lexer* lexer, u32* line, __m256i slash, __m256i star, __m256i newline)
+{
+	u8* start      = lexer->cursor;
+	u32 start_line = *line;
+
+	lexer->cursor += 2;
+
+	unsigned long skip;
+	for (;;)
+	{
+		__m256i c = _mm256_loadu_si256((__m256i*)lexer->cursor);
+
+		u32 slash_mask   = _mm256_movemask_epi8(_mm256_cmpeq_epi8(c, slash));
+		u32 star_mask    = _mm256_movemask_epi8(_mm256_cmpeq_epi8(c, star));
+		u32 newline_mask = _mm256_movemask_epi8(_mm256_cmpeq_epi8(c, newline));
+
+		u32 mask = (star_mask << 1) & slash_mask;
+
+		if (_BitScanForward(&skip, mask))
+		{
+			*line += _mm_popcnt_u32(newline_mask & ((1 << skip) - 1));
+			lexer->cursor += skip + 1;
+			break;
+		}
+		else
+		{
+			if (_mm256_testz_si256(c, c))
+			{
+				//// ERROR
+				Lexer__Error(lexer, "Unterminated block comment", start, start_line);
+				return false;
+			}
+			else
+			{
+				*line += _mm_popcnt_u32(newline_mask & 0x7FFFFFFF);
+
+				lexer->cursor += 31; // there might be a * at the end, so only skip 31
+				continue;
+			}
+		}
+	}
+
+	return true;
+}
+
+FORCE_INLINE static void
+Lexer__SkipSingleLineComment(Lexer* lexer, __m256i newline)
+{
+	for (;;)
+	{
+		__m256i c = _mm256_loadu_si256((__m256i*)lexer->cursor);
+		if (_mm256_testz_si256(c, c)) break;
+
+		u32 newline_mask = _mm256_movemask_epi8(_mm256_cmpeq_epi8(c, newline));
+
+		unsigned long skip;
+		if (_BitScanForward(&skip, newline_mask))
+		{
+			lexer->cursor += skip;
+			break;
+		}
+		else
+		{
+			lexer->cursor += 32;
+			continue;
+		}
+	}
+}
+
 static bool
 LexFile(String input, Virtual_Array* tokens, Virtual_Array* string_array, Token** first_token, u32* token_count)
 {
@@ -461,67 +531,15 @@ LexFile(String input, Virtual_Array* tokens, Virtual_Array* string_array, Token*
 
 			if (lexer.cursor[0] == '/' && lexer.cursor[1] == '*')
 			{
-				u8* start      = lexer.cursor;
-				u32 start_line = line;
-
-				lexer.cursor += 2;
-
-				unsigned long skip;
-				for (;;)
+				if (!Lexer__SkipBlockComment(&lexer, &line, slash, star, newline))
 				{
-					__m256i c = _mm256_loadu_si256((__m256i*)lexer.cursor);
-
-					u32 slash_mask   = _mm256_movemask_epi8(_mm256_cmpeq_epi8(c, slash));
-					u32 star_mask    = _mm256_movemask_epi8(_mm256_cmpeq_epi8(c, star));
-					u32 newline_mask = _mm256_movemask_epi8(_mm256_cmpeq_epi8(c, newline));
-
-					u32 mask = (star_mask << 1) & slash_mask;
-
-					if (_BitScanForward(&skip, mask))
-					{
-						line += _mm_popcnt_u32(newline_mask & ((1 << skip) - 1));
-						lexer.cursor += skip + 1;
-						break;
-					}
-					else
-					{
-						if (_mm256_testz_si256(c, c))
-						{
-							//// ERROR
-							Lexer__Error(&lexer, "Unterminated block comment", start, start_line);
-							return false;
-						}
-						else
-						{
-							line += _mm_popcnt_u32(newline_mask & 0x7FFFFFFF);
-
-							lexer.cursor += 31; // there might be a * at the end, so only skip 31
-							continue;
-						}
-					}
+					//// ERROR
+					return false;
 				}
 			}
 			else if (lexer.cursor[0] == '/' && lexer.cursor[1] == '/')
 			{
-				for (;;)
-				{
-					__m256i c = _mm256_loadu_si256((__m256i*)lexer.cursor);
-					if (_mm256_testz_si256(c, c)) break;
-
-					u32 newline_mask = _mm256_movemask_epi8(_mm256_cmpeq_epi8(c, newline));
-
-					unsigned long skip;
-					if (_BitScanForward(&skip, newline_mask))
-					{
-						lexer.cursor += skip;
-						break;
-					}
-					else
-					{
-						lexer.cursor += 32;
-						continue;
-					}
-				}
+				Lexer__SkipSingleLineComment(&lexer, newline);
 			}
 			else break;
 		}
@@ -587,7 +605,7 @@ LexFile(String input, Virtual_Array* tokens, Virtual_Array* string_array, Token*
 				{
 					*token = (Token){
 						.kind   = Token_Ident,
-						.len    = len,
+						.len    = (u16)len,
 						.offset = offset,
 						.data   = start,
 					};
@@ -701,6 +719,9 @@ LexFile(String input, Virtual_Array* tokens, Virtual_Array* string_array, Token*
 			}
 		}
 	}
+
+	// NOTE: This is effectively zero padding to remove bounds checks in the parser
+	for (umm i = 0; i < 3; ++i) *(Token*)VA_Push(tokens) = (Token){ .kind = Token_EOF };
 
 	*token_count = (u32)((Token*)VA_EndPointer(tokens) - *first_token);
 

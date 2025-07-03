@@ -155,19 +155,25 @@ wmain(int argc, wchar_t** argv)
 	f64 max_t_mlocps = 0;
 	for (umm i = 0; i < 10; ++i)
 	{
-		Virtual_Array token_array  = VA_Create(sizeof(Token), 3ULL << 30, 1024);
-		Virtual_Array string_array = VA_Create(sizeof(u8), 1ULL << 30, 256);
-
-#if 1
-		VA_EnsureCommitted(&token_array, input.len / 8);
-		memset(token_array.data, '0', token_array.committed);
-#endif
-
 		Token* tokens   = 0;
 		u32 token_count = 0;
 
+#if 1
+		Virtual_Array token_array  = VA_Create(sizeof(Token), 3ULL << 30, 1024);
+		Virtual_Array string_array = VA_Create(sizeof(u8), 1ULL << 30, 256);
+
+		VA_EnsureCommitted(&token_array, input.len / 8);
+		memset(token_array.data, '0', token_array.committed);
+
 		LARGE_INTEGER start_t;
 		QueryPerformanceCounter(&start_t);
+#else
+		LARGE_INTEGER start_t;
+		QueryPerformanceCounter(&start_t);
+
+		Virtual_Array token_array  = VA_Create(sizeof(Token), 3ULL << 30, 1024);
+		Virtual_Array string_array = VA_Create(sizeof(u8), 1ULL << 30, 256);
+#endif
 
 		LexFile(input, &token_array, &string_array, &tokens, &token_count);
 
