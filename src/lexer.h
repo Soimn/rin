@@ -500,8 +500,6 @@ LexFile(String input, Virtual_Array* tokens, Virtual_Array* string_array, Token*
 						}
 					}
 				}
-
-				if (token->kind == Token_Error) break;
 			}
 			else if (lexer.cursor[0] == '/' && lexer.cursor[1] == '/')
 			{
@@ -528,8 +526,7 @@ LexFile(String input, Virtual_Array* tokens, Virtual_Array* string_array, Token*
 			else break;
 		}
 
-		u32 offset = (u32)(lexer.cursor - input.data);
-		token->offset = offset;
+		u32 offset = (u32)(lexer.cursor - lexer.contents);
 
 		if (Char_IsAlpha(*lexer.cursor) || *lexer.cursor == '_')
 		{
@@ -543,9 +540,13 @@ LexFile(String input, Virtual_Array* tokens, Virtual_Array* string_array, Token*
 			unsigned long ident_skip = 0;
 			if (_BitScanForward(&ident_skip, ident_mask+1))
 			{
-				token->kind = Token_Ident;
-				token->len  = (u16)ident_skip;
-				token->data = lexer.cursor;
+				*token = (Token){
+					.kind   = Token_Ident,
+					.len    = (u16)ident_skip,
+					.offset = offset,
+					.data   = lexer.cursor,
+				};
+
 				lexer.cursor += ident_skip;
 			}
 			else
@@ -584,9 +585,12 @@ LexFile(String input, Virtual_Array* tokens, Virtual_Array* string_array, Token*
 				}
 				else
 				{
-					token->kind = Token_Ident;
-					token->len  = (u16)len;
-					token->data = start;
+					*token = (Token){
+						.kind   = Token_Ident,
+						.len    = len,
+						.offset = offset,
+						.data   = start,
+					};
 				}
 			}
 		}
@@ -631,12 +635,16 @@ LexFile(String input, Virtual_Array* tokens, Virtual_Array* string_array, Token*
 			u8 c1_c  = (lexer.cursor[1] == c);
 			u8 c1_eq = (lexer.cursor[1] == '=');
 
-			token->kind = c;
+			*token = (Token){
+				.kind   = c,
+				.offset = offset,
+			};
+
 			lexer.cursor += 1;
 
 			if (pattern >= 0)
 			{
-				if (pattern != 0)
+				if (pattern > 0)
 				{
 					u8 ext = c1_eq + c1_c + c1_c;
 					u8 resolved_pattern = pattern & ext;
