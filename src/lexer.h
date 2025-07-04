@@ -60,13 +60,19 @@ Lexer__ParseHexInt(Lexer* lexer, Token* token, u32 line)
 	{
 		if (digit_count == 16)
 		{
-			token->kind     = Token_Float;
-			token->floating = (F64_Bits){ .bits = value }.f;
+			*token = (Token){
+				.kind     = Token_Float,
+				.offset   = (u32)(start - lexer->contents),
+				.floating = (F64_Bits){ .bits = value }.f,
+			};
 		}
 		else if (digit_count == 8)
 		{
-			token->kind     = Token_Float;
-			token->floating = (F32_Bits){ .bits = (u32)value }.f;
+			*token = (Token){
+				.kind     = Token_Float,
+				.offset   = (u32)(start - lexer->contents),
+				.floating = (F32_Bits){ .bits = (u32)value }.f,
+			};
 		}
 		else
 		{
@@ -79,8 +85,11 @@ Lexer__ParseHexInt(Lexer* lexer, Token* token, u32 line)
 	{
 		if (digit_count <= 16)
 		{
-			token->kind    = Token_Int;
-			token->integer = value;
+			*token = (Token){
+				.kind    = Token_Int,
+				.offset  = (u32)(start - lexer->contents),
+				.integer = value,
+			};
 		}
 		else
 		{
@@ -120,12 +129,7 @@ Lexer__ParseInt(Lexer* lexer, Token* token, u32 line)
 
 	if (*lexer->cursor != '.' && (*lexer->cursor&0xDF) != 'E')
 	{
-		if (digit_count < 19)
-		{
-			token->kind    = Token_Int;
-			token->integer = value;
-		}
-		else
+		if (digit_count >= 19)
 		{
 			value = 0;
 
@@ -144,10 +148,13 @@ Lexer__ParseInt(Lexer* lexer, Token* token, u32 line)
 					return false;
 				}
 			}
-
-			token->kind    = Token_Int;
-			token->integer = value;
 		}
+
+		*token = (Token){
+			.kind    = Token_Int,
+			.offset  = (u32)(start - lexer->contents),
+			.integer = value,
+		};
 	}
 	else
 	{
@@ -232,8 +239,11 @@ Lexer__ParseInt(Lexer* lexer, Token* token, u32 line)
 			}
 		}
 
-		token->kind     = Token_Float;
-		token->floating = strtod(buffer, 0); // TODO: replace
+		*token = (Token){
+			.kind     = Token_Float,
+			.offset   = (u32)(start - lexer->contents),
+			.floating = strtod(buffer, 0), // TODO: replace
+		};
 	}
 
 	return true;
@@ -246,8 +256,9 @@ Lexer__ParseString(Lexer* lexer, Token* token, Virtual_Array* string_array, u32 
 
 	u8 terminator = *lexer->cursor;
 
-	++lexer->cursor;
 	u8* start = lexer->cursor;
+	++lexer->cursor;
+
 	for (;;)
 	{
 		if (*lexer->cursor == 0 || *lexer->cursor == terminator) break;
@@ -268,8 +279,8 @@ Lexer__ParseString(Lexer* lexer, Token* token, Virtual_Array* string_array, u32 
 
 		ASSERT(end - start < ~(u32)0);
 
-		u8* raw = start;
-		u32 cap = (u32)(end - start);
+		u8* raw = start + 1;
+		u32 cap = (u32)(end - (start+1));
 
 		String string = {
 			.data = VA_PushN(string_array, cap),
@@ -413,9 +424,12 @@ Lexer__ParseString(Lexer* lexer, Token* token, Virtual_Array* string_array, u32 
 			return false;
 		}
 
-		token->kind = (terminator == '"' ? Token_String : Token_Char);
-		token->len  = (u16)string.len;
-		token->data = string.data;
+		*token = (Token){
+			.kind   = (terminator == '"' ? Token_String : Token_Char),
+			.len    = (u16)string.len,
+			.offset = (u32)(start - lexer->contents),
+			.data   = string.data,
+		};
 	}
 
 	return true;
@@ -614,7 +628,7 @@ LexFile(String input, Virtual_Array* tokens, Virtual_Array* string_array, Token*
 		}
 		else
 		{
-			static s8 Lexer__PatternTable[256] = {
+			static s16 Lexer__PatternTable[256] = {
 				['#'] = -1,
 				['$'] = -1,
 				['('] = -1,
@@ -632,89 +646,98 @@ LexFile(String input, Virtual_Array* tokens, Virtual_Array* string_array, Token*
 				['}'] = -1,
 
 				['!'] = 1,
-				['%'] = 1,
-				['*'] = 1,
-				['/'] = 1,
-				['~'] = 1,
+				['%'] = 1 | 0x80,
+				['*'] = 1 | 0x80,
+				['/'] = 1 | 0x80,
+				['~'] = 1 | 0x80,
 
 				['='] = 1 | 2,
-				['&'] = 1 | 2,
-				['|'] = 1 | 2,
-				['+'] = 1 | 2,
-				['-'] = 1 | 2,
+				['&'] = 1 | 2 | 0x80,
+				['|'] = 1 | 2 | 0x80,
+				['+'] = 1 | 2 | 0x880,
+				['-'] = 1 | 2 | 0x880,
 
-				['<'] = 1 | 2 | 4,
-				['>'] = 1 | 2 | 4,
+				['<'] = 1 | 2 | 4 | 0x80,
+				['>'] = 1 | 2 | 4 | 0x80,
 			};
 
 			u8 c = lexer.cursor[0];
-			s8 pattern = Lexer__PatternTable[c];
+			s16 pattern = Lexer__PatternTable[c];
 
-			u8 c1_c  = (lexer.cursor[1] == c);
-			u8 c1_eq = (lexer.cursor[1] == '=');
-
-			*token = (Token){
-				.kind   = c,
-				.offset = offset,
-			};
-
-			lexer.cursor += 1;
-
-			if (pattern >= 0)
+			if (pattern < 0)
 			{
-				if (pattern > 0)
+				lexer.cursor += 1;
+
+				*token = (Token){
+					.kind   = c,
+					.offset = offset,
+				};
+			}
+			else if (pattern != 0)
+			{
+				u8 c1_c  = (lexer.cursor[1] == c);
+				u8 c1_eq = (lexer.cursor[1] == '=');
+
+				u16 resolved_pattern = pattern & (c1_c + c1_c + c1_eq);
+				
+				u16 kind      = c | (pattern & 0x880) | (resolved_pattern << 8);
+				lexer.cursor += 1 + (resolved_pattern != 0);
+
+				*token = (Token){
+					.kind   = kind,
+					.offset = offset,
+				};
+
+				if ((pattern&4) && c1_eq)
 				{
-					u8 ext = c1_eq + c1_c + c1_c;
-					u8 resolved_pattern = pattern & ext;
-
-					token->kind  |= (resolved_pattern << 7);
-					lexer.cursor += (resolved_pattern != 0);
-
-					if ((pattern&4) && c1_c && *lexer.cursor == '=')
-					{
-						token->kind  |= 0x80;
-						lexer.cursor += 1;
-					}
+					token->kind = c | 0x480;
 				}
-				else // ", ', 0-9, \, ` or >= 0x7F
-				{
-					lexer.cursor -= 1;
 
-					if (lexer.cursor[0] == '0' && (lexer.cursor[1] == 'x' || lexer.cursor[1] == 'h'))
-					{
-						if (!Lexer__ParseHexInt(&lexer, token, line))
-						{
-							//// ERROR
-							return false;
-						}
-					}
-					else if (Char_IsDigit(lexer.cursor[0]))
-					{
-						if (!Lexer__ParseInt(&lexer, token, line))
-						{
-							//// ERROR
-							return false;
-						}
-					}
-					else if (lexer.cursor[0] == '"' || lexer.cursor[0] == '\'')
-					{
-						if (!Lexer__ParseString(&lexer, token, string_array, line))
-						{
-							//// ERROR
-							return false;
-						}
-					}
-					else if (lexer.cursor[0] == 0)
-					{
-						token->kind = Token_EOF;
-						break;
-					}
-					else
+				if ((pattern&4) && c1_c && *lexer.cursor == '=')
+				{
+					token->kind |= 0x100;
+					lexer.cursor += 1;
+				}
+			}
+			else  // ", ', 0-9, \, ` or >= 0x7F
+			{
+				if (lexer.cursor[0] == '0' && (lexer.cursor[1] == 'x' || lexer.cursor[1] == 'h'))
+				{
+					if (!Lexer__ParseHexInt(&lexer, token, line))
 					{
 						//// ERROR
-						Lexer__Error(&lexer, "Unknown symbol", lexer.cursor, line);
 						return false;
 					}
+				}
+				else if (Char_IsDigit(lexer.cursor[0]))
+				{
+					if (!Lexer__ParseInt(&lexer, token, line))
+					{
+						//// ERROR
+						return false;
+					}
+				}
+				else if (lexer.cursor[0] == '"' || lexer.cursor[0] == '\'')
+				{
+					if (!Lexer__ParseString(&lexer, token, string_array, line))
+					{
+						//// ERROR
+						return false;
+					}
+				}
+				else if (lexer.cursor[0] == 0)
+				{
+					*token = (Token){
+						.kind = Token_EOF,
+						.offset = offset,
+					};
+					break;
+				}
+				else
+				{
+					//// ERROR
+					Lexer__Error(&lexer, "Unknown symbol", lexer.cursor, line);
+					return false;
 				}
 			}
 		}
