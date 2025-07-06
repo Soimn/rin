@@ -6,75 +6,84 @@
 #include "../src/lexer.h"
 #include "reference_lexer.h"
 
-void
-PrintToken(FILE* stream, Token token)
-{
-	String kind_string = TokenKind__ToString(token.kind);
-
-	fprintf(stream, "kind = %.*s (%u), offset = %u, len = %u, data = %llu (", (int)kind_string.len, kind_string.data, token.kind, token.offset, token.len, (u64)token.data);
-	if      (token.kind == Token_Ident) fprintf(stream, "\"%.*s\"", (int)token.len, token.data);
-	else if (token.kind == Token_Int)    fprintf(stream, "%llu", token.integer);
-	else if (token.kind == Token_Float)  fprintf(stream, "%.16f", token.floating);
-	else if (token.kind == Token_String) fprintf(stream, "\"%.*s\"", (int)token.len, token.data);
-	else if (token.kind == Token_Char)   fprintf(stream, "'%.*s'", (int)token.len, token.data);
-	fprintf(stream, ")");
-}
-
-bool
-TokensEqual(Token a, Token b)
-{
-	bool result = false;
-
-	if (a.kind == b.kind && a.offset == b.offset && a.len == b.len)
-	{
-		if (a.kind == Token_String || a.kind == Token_Char || a.kind == Token_Ident)
-		{
-			result = (strncmp((char*)a.data, (char*)b.data, a.len) == 0);
-		}
-		else
-		{
-			result = (a.data == b.data);
-		}
-	}
-
-	return result;
-}
-
 bool
 VerifyLexer(String input)
 {
 	bool encountered_errors = false;
 
-	Virtual_Array ref_token_array = VA_Create(sizeof(Token), 3ULL << 30, 1024);
+	Virtual_Array ref_token_array  = VA_Create(sizeof(Token), 3ULL << 30, 1024);
+	Virtual_Array ref_string_array = VA_Create(sizeof(u8), 1ULL << 30, 256);
 	Token* ref_tokens   = 0;
 	u32 ref_token_count = 0;
 
-	RefLexFile(input, &ref_token_array, &ref_tokens, &ref_token_count); // TODO: Error handling
+	bool ref_succeeded = RefLexFile(input, &ref_token_array, &ref_string_array, &ref_tokens, &ref_token_count);
+	ASSERT(ref_succeeded);
 
 	Virtual_Array token_array  = VA_Create(sizeof(Token), 3ULL << 30, 1024);
 	Virtual_Array string_array = VA_Create(sizeof(u8), 1ULL << 30, 256);
 	Token* tokens   = 0;
 	u32 token_count = 0;
 
-	LexFile(input, &token_array, &string_array, &tokens, &token_count); // TODO: Error handling
+	bool succeeded = LexFile(input, &token_array, &string_array, &tokens, &token_count);
+	ASSERT(succeeded);
 
 	for (u32 i = 0; i < MIN(token_count, ref_token_count); ++i)
 	{
-		Token token     = tokens[i];
+		Token token = tokens[i];
 		Token ref_token = ref_tokens[i];
 
-		if (!TokensEqual(token, ref_token))
+		String token_string     = TokenKind__ToString(token.kind);
+		String ref_token_string = TokenKind__ToString(ref_token.kind);
+		
+		if (token.kind != ref_token.kind || token.len != ref_token.len || token.offset != ref_token.offset)
 		{
 			fprintf(stderr, "TOKEN MISMATCH\n");
-			fprintf(stderr, "\nlexer output:\n");
-			PrintToken(stderr, token);
-			fprintf(stderr, "\n\nreference output:\n");
-			PrintToken(stderr, ref_token);
-			fprintf(stderr, "\n");
-
+			fprintf(stderr, "got:      kind = %18.*s, len = %5u, offset = %10u\n", (int)token_string.len, (char*)token_string.data, token.len, token.offset);
+			fprintf(stderr, "expected: kind = %18.*s, len = %5u, offset = %10u\n", (int)ref_token_string.len, (char*)ref_token_string.data, ref_token.len, ref_token.offset);
 			encountered_errors = true;
 			break;
 		}
+
+		Token_Data* token_data     = (Token_Data*)&tokens[i+1];
+		Token_Data* ref_token_data = (Token_Data*)&ref_tokens[i+1];
+
+		if ((token.kind == Token_Int || token.kind == Token_Char) && token_data->integer != ref_token_data->integer)
+		{
+			fprintf(stderr, "DATA MISMATCH\n");
+			fprintf(stderr, "got:      kind = %18.*s, len = %5u, offset = %10u, data = %20llu\n", (int)token_string.len, (char*)token_string.data, token.len, token.offset, token_data->integer);
+			fprintf(stderr, "expected: kind = %18.*s, len = %5u, offset = %10u, data = %20llu\n", (int)ref_token_string.len, (char*)ref_token_string.data, ref_token.len, ref_token.offset, ref_token_data->integer);
+			encountered_errors = true;
+			break;
+		}
+		else if (token.kind == Token_Float && token_data->floating != ref_token_data->floating)
+		{
+			fprintf(stderr, "DATA MISMATCH\n");
+			fprintf(stderr, "got:      kind = %18.*s, len = %5u, offset = %10u, data = %.16f\n", (int)token_string.len, (char*)token_string.data, token.len, token.offset, token_data->floating);
+			fprintf(stderr, "expected: kind = %18.*s, len = %5u, offset = %10u, data = %.16f\n", (int)ref_token_string.len, (char*)ref_token_string.data, ref_token.len, ref_token.offset, ref_token_data->floating);
+			encountered_errors = true;
+			break;
+		}
+		else if (token.kind == Token_String && strncmp((char*)token_data->string, (char*)ref_token_data->string, token.len) != 0)
+		{
+			fprintf(stderr, "DATA MISMATCH\n");
+			fprintf(stderr, "got:      kind = %18.*s, len = %5u, offset = %10u, data =\"%.*s\"\n", (int)token_string.len, (char*)token_string.data, token.len, token.offset, (int)ref_token.len, (char*)token_data->string);
+			fprintf(stderr, "expected: kind = %18.*s, len = %5u, offset = %10u, data =\"%.*s\"\n", (int)ref_token_string.len, (char*)ref_token_string.data, ref_token.len, ref_token.offset, ref_token.len, ref_token_data->string);
+			encountered_errors = true;
+			break;
+		}
+
+		if (token.kind == Token_Int || token.kind == Token_Char || token.kind == Token_Float || token.kind == Token_String)
+		{
+			i += 1;
+		}
+	}
+
+	if (!encountered_errors && token_count != ref_token_count)
+	{
+		fprintf(stderr, "TOKEN COUNT MISMATCH\n");
+		fprintf(stderr, "got:      %10u\n", token_count);
+		fprintf(stderr, "expected: %10u\n", ref_token_count);
+		encountered_errors = true;
 	}
 
 	VA_Destroy(&ref_token_array);

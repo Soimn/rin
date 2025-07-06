@@ -101,7 +101,11 @@ Clean(u8* contents)
 	{
 		while ((u8)(contents[read_cursor]-1) < 0x20)
 		{
-			Clean__Accept(contents, &read_cursor, &write_cursor);
+			if (contents[read_cursor] == '\n' && read_cursor > 0 && contents[read_cursor-1] != '\r')
+			{
+				Clean__Reject(&read_cursor);
+			}
+			else Clean__Accept(contents, &read_cursor, &write_cursor);
 		}
 
 		if (contents[read_cursor] == 0)
@@ -158,41 +162,49 @@ Clean(u8* contents)
 		}
 		else if (contents[read_cursor] == '0' && contents[read_cursor+1] == 'x')
 		{
-			Clean__Accept(contents, &read_cursor, &write_cursor);
-			Clean__Accept(contents, &read_cursor, &write_cursor);
-
-			for (umm i = 0; Char_IsDigit(contents[read_cursor]) || Char_IsHexAlpha(contents[read_cursor]); ++i)
-			{
-				if (i < 16) Clean__Accept(contents, &read_cursor, &write_cursor);
-				else        Clean__Reject(&read_cursor);
-			}
-
-			if (contents[read_cursor] == '.')
+			if (!Char_IsDigit(contents[read_cursor+2]) && !Char_IsHexAlpha(contents[read_cursor+2]))
 			{
 				Clean__Reject(&read_cursor);
-
-				while (Char_IsDigit(contents[read_cursor]) || Char_IsHexAlpha(contents[read_cursor]))
-				{
-					Clean__Reject(&read_cursor);
-				}
-
-				if ((contents[read_cursor]&0xDF) == 'P')
-				{
-					Clean__Reject(&read_cursor);
-
-					if (contents[read_cursor] == '+' || contents[read_cursor] == '-')
-					{
-						Clean__Reject(&read_cursor);
-					}
-
-					while (Char_IsDigit(contents[read_cursor]))
-					{
-						Clean__Reject(&read_cursor);
-					}
-				}
+				Clean__Reject(&read_cursor);
 			}
+			else
+			{
+				Clean__Accept(contents, &read_cursor, &write_cursor);
+				Clean__Accept(contents, &read_cursor, &write_cursor);
 
-			Clean__RejectNumberSuffix(contents, &read_cursor);
+				for (umm i = 0; Char_IsDigit(contents[read_cursor]) || Char_IsHexAlpha(contents[read_cursor]); ++i)
+				{
+					if (i < 16) Clean__Accept(contents, &read_cursor, &write_cursor);
+					else        Clean__Reject(&read_cursor);
+				}
+
+				if (contents[read_cursor] == '.')
+				{
+					Clean__Reject(&read_cursor);
+
+					while (Char_IsDigit(contents[read_cursor]) || Char_IsHexAlpha(contents[read_cursor]))
+					{
+						Clean__Reject(&read_cursor);
+					}
+
+					if ((contents[read_cursor]&0xDF) == 'P')
+					{
+						Clean__Reject(&read_cursor);
+
+						if (contents[read_cursor] == '+' || contents[read_cursor] == '-')
+						{
+							Clean__Reject(&read_cursor);
+						}
+
+						while (Char_IsDigit(contents[read_cursor]))
+						{
+							Clean__Reject(&read_cursor);
+						}
+					}
+				}
+
+				Clean__RejectNumberSuffix(contents, &read_cursor);
+			}
 		}
 		else if (Char_IsDigit(contents[read_cursor]) && contents[read_cursor+1] == '.' && !Char_IsDigit(contents[read_cursor+2]))
 		{
@@ -233,36 +245,95 @@ Clean(u8* contents)
 							Clean__Accept(contents, &read_cursor, &write_cursor);
 						}
 					}
-				}
 
-				if ((contents[read_cursor]&0xDF) == 'E')
-				{
-					if (Char_IsDigit(contents[read_cursor+1]) || ((contents[read_cursor+1] == '+' || contents[read_cursor+1] == '-') && Char_IsDigit(contents[read_cursor+2])))
+					if ((contents[read_cursor]&0xDF) == 'E')
 					{
-						Clean__Accept(contents, &read_cursor, &write_cursor);
-
-						if (contents[read_cursor] == '+' || contents[read_cursor] == '-')
+						if (Char_IsDigit(contents[read_cursor+1]) || ((contents[read_cursor+1] == '+' || contents[read_cursor+1] == '-') && Char_IsDigit(contents[read_cursor+2])))
 						{
 							Clean__Accept(contents, &read_cursor, &write_cursor);
-						}
 
-						while (Char_IsDigit(contents[read_cursor]))
-						{
-							Clean__Accept(contents, &read_cursor, &write_cursor);
+							if (contents[read_cursor] == '+' || contents[read_cursor] == '-')
+							{
+								Clean__Accept(contents, &read_cursor, &write_cursor);
+							}
+
+							while (Char_IsDigit(contents[read_cursor]))
+							{
+								Clean__Accept(contents, &read_cursor, &write_cursor);
+							}
 						}
+						else
+						{
+							Clean__Reject(&read_cursor);
+						}
+					}
+				}
+				else if ((contents[read_cursor]&0xDF) == 'E')
+				{
+					if (write_cursor+2 < read_cursor && (Char_IsDigit(contents[read_cursor+1]) || contents[read_cursor+1] == '+' || contents[read_cursor+1] == '-'))
+					{
+						contents[write_cursor++] = '.';
+						contents[write_cursor++] = '0';
 					}
 					else
 					{
 						Clean__Reject(&read_cursor);
+						if (contents[read_cursor] == '-' || contents[read_cursor] == '+') Clean__Reject(&read_cursor);
+
+						while (Char_IsDigit(contents[read_cursor]))
+						{
+							Clean__Reject(&read_cursor);
+						}
 					}
 				}
 			}
 
 			Clean__RejectNumberSuffix(contents, &read_cursor);
 		}
-		else if (contents[read_cursor] == '"' || contents[read_cursor] == '\'')
+		else if (contents[read_cursor] == '\'')
 		{
-			u8 terminator = contents[read_cursor];
+			if (contents[read_cursor+1] == '\'')
+			{
+				Clean__Reject(&read_cursor);
+				Clean__Reject(&read_cursor);
+			}
+			else
+			{
+				Clean__Accept(contents, &read_cursor, &write_cursor);
+				if (contents[read_cursor] == '\\')
+				{
+					u8 accepted_seqs[] = { 'a', 'b', 'e', 'f', 'n', 'r', 't', 'v', '\\', '\'', '"' };
+
+					bool is_accepted = false;
+					for (umm i = 0; i < ARRAY_LEN(accepted_seqs); ++i)
+					{
+						if (contents[read_cursor+1] == accepted_seqs[i])
+						{
+							is_accepted = true;
+							break;
+						}
+					}
+
+					if (is_accepted)
+					{
+						Clean__Accept(contents, &read_cursor, &write_cursor);
+						Clean__Accept(contents, &read_cursor, &write_cursor);
+					}
+					else
+					{
+						Clean__Replace(contents, &read_cursor, &write_cursor, ' ');
+					}
+				}
+				else Clean__Accept(contents, &read_cursor, &write_cursor);
+
+				while (contents[read_cursor] != 0 && contents[read_cursor] != '\'') Clean__Reject(&read_cursor);
+				ASSERT(contents[read_cursor] != 0);
+				Clean__Accept(contents, &read_cursor, &write_cursor);
+			}
+		}
+		else if (contents[read_cursor] == '"')
+		{
+			u8 terminator = '"';
 
 			Clean__Accept(contents, &read_cursor, &write_cursor);
 

@@ -1,5 +1,5 @@
 static bool
-IsZeroed(void* ptr, umm size)
+IsZero(void* ptr, umm size)
 {
 	bool result = true;
 
