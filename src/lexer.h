@@ -1,10 +1,100 @@
 #define LEXER_ZPAD 65
 
-typedef struct Lexer_LUT
+typedef struct Lexer_LUT_Entry
 {
 	u16 kind;
 	u16 skip;
-} Lexer_LUT;
+} Lexer_LUT_Entry;
+
+#define DB 0x100
+#define EQ 0x80
+static Lexer_LUT_Entry Lexer_LUT[512] = {
+	['#']      = { Token_Pound,        1 },
+	['#' | DB] = { Token_Pound,        1 },
+	['#' | EQ] = { Token_Pound,        1 },
+	['$']      = { Token_Cash,         1 },
+	['$' | DB] = { Token_Cash,         1 },
+	['$' | EQ] = { Token_Cash,         1 },
+	['(']      = { Token_OpenParen,    1 },
+	['(' | DB] = { Token_OpenParen,    1 },
+	['(' | EQ] = { Token_OpenParen,    1 },
+	[')']      = { Token_CloseParen,   1 },
+	[')' | DB] = { Token_CloseParen,   1 },
+	[')' | EQ] = { Token_CloseParen,   1 },
+	[',']      = { Token_Comma,        1 },
+	[',' | DB] = { Token_Comma,        1 },
+	[',' | EQ] = { Token_Comma,        1 },
+	['.']      = { Token_Dot,          1 },
+	['.' | DB] = { Token_Dot,          1 },
+	['.' | EQ] = { Token_Dot,          1 },
+	[':']      = { Token_Colon,        1 },
+	[':' | DB] = { Token_Colon,        1 },
+	[':' | EQ] = { Token_Colon,        1 },
+	[';']      = { Token_Semicolon,    1 },
+	[';' | DB] = { Token_Semicolon,    1 },
+	[';' | EQ] = { Token_Semicolon,    1 },
+	['?']      = { Token_QMark,        1 },
+	['?' | DB] = { Token_QMark,        1 },
+	['?' | EQ] = { Token_QMark,        1 },
+	['@']      = { Token_At,           1 },
+	['@' | DB] = { Token_At,           1 },
+	['@' | EQ] = { Token_At,           1 },
+	['[']      = { Token_OpenBracket,  1 },
+	['[' | DB] = { Token_OpenBracket,  1 },
+	['[' | EQ] = { Token_OpenBracket,  1 },
+	[']']      = { Token_CloseBracket, 1 },
+	[']' | DB] = { Token_CloseBracket, 1 },
+	[']' | EQ] = { Token_CloseBracket, 1 },
+	['^']      = { Token_Hat,          1 },
+	['^' | DB] = { Token_Hat,          1 },
+	['^' | EQ] = { Token_Hat,          1 },
+	['{']      = { Token_OpenBrace,    1 },
+	['{' | DB] = { Token_OpenBrace,    1 },
+	['{' | EQ] = { Token_OpenBrace,    1 },
+	['}']      = { Token_CloseBrace,   1 },
+	['}' | DB] = { Token_CloseBrace,   1 },
+	['}' | EQ] = { Token_CloseBrace,   1 },
+
+	['%']           = { Token_Percent,    1 },
+	['%' | DB]      = { Token_Percent,    1 },
+	['%' | EQ]      = { Token_PercentEq,  2 },
+	['*']           = { Token_Star,       1 },
+	['*' | DB]      = { Token_Star,       1 },
+	['*' | EQ]      = { Token_StarEq,     2 },
+	['/']           = { Token_Slash,      1 },
+	['/' | DB]      = { Token_Slash,      1 },
+	['/' | EQ]      = { Token_SlashEq,    2 },
+	['~']           = { Token_Tilde,      1 },
+	['~' | DB]      = { Token_Tilde,      1 },
+	['~' | EQ]      = { Token_TildeEq,    2 },
+	['&']           = { Token_And,        1 },
+	['&' | DB]      = { Token_AndAnd,     2 },
+	['&' | EQ]      = { Token_AndEq,      2 },
+	['|']           = { Token_Or,         1 },
+	['|' | DB]      = { Token_OrOr,       2 },
+	['|' | EQ]      = { Token_OrEq,       2 },
+	['<']           = { Token_Lt,         1 },
+	['<' | DB]      = { Token_LtLt,       2 },
+	['<' | EQ]      = { Token_LtEq,       2 },
+	['>']           = { Token_Gt,         1 },
+	['>' | DB]      = { Token_GtGt,       2 },
+	['>' | EQ]      = { Token_GtEq,       2 },
+	['-']           = { Token_Minus,      1 },
+	['-' | DB]      = { Token_MinusMinus, 2 },
+	['-' | EQ]      = { Token_MinusEq,    2 },
+	['+']           = { Token_Plus,       1 },
+	['+' | DB]      = { Token_PlusPlus,   2 },
+	['+' | EQ]      = { Token_PlusEq,     2 },
+	['=']           = { Token_Eq,         1 },
+	['=' | EQ]      = { Token_EqEq,       2 },
+	['=' | DB]      = { Token_EqEq,       2 },
+	['=' | DB | EQ] = { Token_EqEq,       2 },
+	['!']           = { Token_Bang,       1 },
+	['!' | DB]      = { Token_Bang,       1 },
+	['!' | EQ]      = { Token_BangEq,     2 },
+};
+#undef DB
+#undef EQ
 
 static bool
 LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, Token** first_token, u32* token_count)
@@ -16,166 +106,136 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 
 	u8* cursor = input.data;
 
+	__m256i hex_df       = _mm256_set1_epi8(0xDF);
+	__m256i alpha_bias   = _mm256_set1_epi8(0x7F - 'Z');
+	__m256i alpha_thresh = _mm256_set1_epi8(0x7E - ('Z' - 'A'));
+	__m256i digit_bias   = _mm256_set1_epi8(0x7F - '9');
+	__m256i digit_thresh = _mm256_set1_epi8(0x7E - ('9' - '0'));
+	__m256i underscore   = _mm256_set1_epi8('_');
+	__m256i slash        = _mm256_set1_epi8('/');
+	__m256i star         = _mm256_set1_epi8('*');
+
 	for (;;)
 	{
 		for (;;)
 		{
 			while ((u8)(*cursor-1) < (u8)0x20) ++cursor;
 
-			if (cursor[0] == '/' && cursor[1] == '/')
+			if (cursor[0] == '/' && cursor[1] == '*')
+			{
+				cursor += 2;
+
+				for (;;)
+				{
+					__m256i c = _mm256_loadu_si256((__m256i*)cursor);
+					if (_mm256_testz_si256(c, c))
+					{
+						//// ERROR: Unterminated block comment
+						__debugbreak();
+						return false;
+					}
+
+					u32 slash_mask = _mm256_movemask_epi8(_mm256_cmpeq_epi8(c, slash));
+					u32 star_mask  = _mm256_movemask_epi8(_mm256_cmpeq_epi8(c, star));
+
+					u32 mask = (star_mask << 1) & slash_mask;
+
+					if (mask == 0)
+					{
+						cursor += 31; // NOTE: 31 in case of a * at the end of the register
+						continue;
+					}
+					else
+					{
+						unsigned long skip;
+						_BitScanForward(&skip, mask);
+						cursor += skip + 1;
+						break;
+					}
+				}
+			}
+			else if (cursor[0] == '/' && cursor[1] == '/')
 			{
 				while (*cursor != 0 && *cursor != '\n') ++cursor;
-			}
-			else if (cursor[0] == '/' && cursor[1] == '*')
-			{
-				cursor += 2;
-
-				while (*cursor != 0 && (cursor[0] != '*' || cursor[1] != '/')) ++cursor;
-
-				if (*cursor == 0)
-				{
-					//// ERROR: Unterminated block comment
-					__debugbreak();
-					return false;
-				}
-
-				cursor += 2;
 			}
 			else break;
 		}
 
-		u32 offset = (u32)(cursor - input.data);
+		Token* token = VA_Push(token_array);
+		token->offset = (u32)(cursor - input.data);
 
 		if (Char_IsAlpha(*cursor) || *cursor == '_')
 		{
-			u8* start = cursor;
+			__m256i c = _mm256_loadu_si256((__m256i*)cursor);
 
-			while (Char_IsAlpha(*cursor) || Char_IsDigit(*cursor) || *cursor == '_') ++cursor;
+			u32 alpha_mask = _mm256_movemask_epi8(_mm256_cmpgt_epi8(_mm256_add_epi8(_mm256_and_si256(c, hex_df), alpha_bias), alpha_thresh));
+			u32 digit_mask = _mm256_movemask_epi8(_mm256_cmpgt_epi8(_mm256_add_epi8(c, digit_bias), digit_thresh));
+			u32 under_mask = _mm256_movemask_epi8(_mm256_cmpeq_epi8(c, underscore));
 
-			u64 len = cursor - start;
+			u32 mask = alpha_mask | digit_mask | under_mask;
 
-			if (len > ~(u16)0)
+			unsigned long skip;
+			if (_BitScanForward(&skip, mask+1))
 			{
-				//// ERROR: Identifier is too long
-				__debugbreak();
-				return false;
-			}
+				token->kind = Token_Ident;
+				token->len  = (u16)skip;
 
-			Token* token = VA_Push(token_array);
-			*token = (Token){
-				.kind   = Token_Ident,
-				.len    = (u16)len,
-				.offset = offset,
-			};
+				cursor += skip;
+			}
+			else
+			{
+				u8* start = cursor;
+				cursor += 32;
+
+				for (;;)
+				{
+					c = _mm256_loadu_si256((__m256i*)cursor);
+
+					alpha_mask = _mm256_movemask_epi8(_mm256_cmpgt_epi8(_mm256_add_epi8(_mm256_and_si256(c, hex_df), alpha_bias), alpha_thresh));
+					digit_mask = _mm256_movemask_epi8(_mm256_cmpgt_epi8(_mm256_add_epi8(c, digit_bias), digit_thresh));
+					under_mask = _mm256_movemask_epi8(_mm256_cmpeq_epi8(c, underscore));
+
+					mask = alpha_mask | digit_mask | under_mask;
+
+					if (mask == 0) break;
+					else if (_BitScanForward(&skip, mask+1))
+					{
+						cursor += skip;
+						break;
+					}
+					else
+					{
+						cursor += 32;
+						continue;
+					}
+				}
+
+				u64 len = cursor - start;
+
+				if (len > ~(u16)0)
+				{
+					//// ERROR: Ident too long
+					__debugbreak();
+					return false;
+				}
+
+				token->kind = Token_Ident;
+				token->len  = (u16)len;
+			}
 		}
 		else
 		{
-#define DB 0x100
-#define EQ 0x80
-			static Lexer_LUT lut[512] = {
-				['#']      = { Token_Pound,        1 },
-				['#' | DB] = { Token_Pound,        1 },
-				['#' | EQ] = { Token_Pound,        1 },
-				['$']      = { Token_Cash,         1 },
-				['$' | DB] = { Token_Cash,         1 },
-				['$' | EQ] = { Token_Cash,         1 },
-				['(']      = { Token_OpenParen,    1 },
-				['(' | DB] = { Token_OpenParen,    1 },
-				['(' | EQ] = { Token_OpenParen,    1 },
-				[')']      = { Token_CloseParen,   1 },
-				[')' | DB] = { Token_CloseParen,   1 },
-				[')' | EQ] = { Token_CloseParen,   1 },
-				[',']      = { Token_Comma,        1 },
-				[',' | DB] = { Token_Comma,        1 },
-				[',' | EQ] = { Token_Comma,        1 },
-				['.']      = { Token_Dot,          1 },
-				['.' | DB] = { Token_Dot,          1 },
-				['.' | EQ] = { Token_Dot,          1 },
-				[':']      = { Token_Colon,        1 },
-				[':' | DB] = { Token_Colon,        1 },
-				[':' | EQ] = { Token_Colon,        1 },
-				[';']      = { Token_Semicolon,    1 },
-				[';' | DB] = { Token_Semicolon,    1 },
-				[';' | EQ] = { Token_Semicolon,    1 },
-				['?']      = { Token_QMark,        1 },
-				['?' | DB] = { Token_QMark,        1 },
-				['?' | EQ] = { Token_QMark,        1 },
-				['@']      = { Token_At,           1 },
-				['@' | DB] = { Token_At,           1 },
-				['@' | EQ] = { Token_At,           1 },
-				['[']      = { Token_OpenBracket,  1 },
-				['[' | DB] = { Token_OpenBracket,  1 },
-				['[' | EQ] = { Token_OpenBracket,  1 },
-				[']']      = { Token_CloseBracket, 1 },
-				[']' | DB] = { Token_CloseBracket, 1 },
-				[']' | EQ] = { Token_CloseBracket, 1 },
-				['^']      = { Token_Hat,          1 },
-				['^' | DB] = { Token_Hat,          1 },
-				['^' | EQ] = { Token_Hat,          1 },
-				['{']      = { Token_OpenBrace,    1 },
-				['{' | DB] = { Token_OpenBrace,    1 },
-				['{' | EQ] = { Token_OpenBrace,    1 },
-				['}']      = { Token_CloseBrace,   1 },
-				['}' | DB] = { Token_CloseBrace,   1 },
-				['}' | EQ] = { Token_CloseBrace,   1 },
-
-				['%']           = { Token_Percent,    1 },
-				['%' | DB]      = { Token_Percent,    1 },
-				['%' | EQ]      = { Token_PercentEq,  2 },
-				['*']           = { Token_Star,       1 },
-				['*' | DB]      = { Token_Star,       1 },
-				['*' | EQ]      = { Token_StarEq,     2 },
-				['/']           = { Token_Slash,      1 },
-				['/' | DB]      = { Token_Slash,      1 },
-				['/' | EQ]      = { Token_SlashEq,    2 },
-				['~']           = { Token_Tilde,      1 },
-				['~' | DB]      = { Token_Tilde,      1 },
-				['~' | EQ]      = { Token_TildeEq,    2 },
-				['&']           = { Token_And,        1 },
-				['&' | DB]      = { Token_AndAnd,     2 },
-				['&' | EQ]      = { Token_AndEq,      2 },
-				['|']           = { Token_Or,         1 },
-				['|' | DB]      = { Token_OrOr,       2 },
-				['|' | EQ]      = { Token_OrEq,       2 },
-				['<']           = { Token_Lt,         1 },
-				['<' | DB]      = { Token_LtLt,       2 },
-				['<' | EQ]      = { Token_LtEq,       2 },
-				['>']           = { Token_Gt,         1 },
-				['>' | DB]      = { Token_GtGt,       2 },
-				['>' | EQ]      = { Token_GtEq,       2 },
-				['-']           = { Token_Minus,      1 },
-				['-' | DB]      = { Token_MinusMinus, 2 },
-				['-' | EQ]      = { Token_MinusEq,    2 },
-				['+']           = { Token_Plus,       1 },
-				['+' | DB]      = { Token_PlusPlus,   2 },
-				['+' | EQ]      = { Token_PlusEq,     2 },
-				['=']           = { Token_Eq,         1 },
-				['=' | EQ]      = { Token_EqEq,       2 },
-				['=' | DB]      = { Token_EqEq,       2 },
-				['=' | DB | EQ] = { Token_EqEq,       2 },
-				['!']           = { Token_Bang,       1 },
-				['!' | DB]      = { Token_Bang,       1 },
-				['!' | EQ]      = { Token_BangEq,     2 },
-			};
-#undef DB
-#undef EQ
-
 			u8 ch  = cursor[0];
 			u16 db = (cursor[1] == cursor[0]);
 			u16 eq = (cursor[1] == '=');
 
 			u16 mod = ((db + db + eq) << 7);
 
-			Lexer_LUT lookup = lut[ch | mod];
+			Lexer_LUT_Entry lookup = Lexer_LUT[ch | mod];
 
 			if (lookup.kind != 0)
 			{
-				Token* token = VA_Push(token_array);
-				*token = (Token){
-					.kind   = lookup.kind,
-					.len    = 0, // TODO: What to encode in this?
-					.offset = offset,
-				};
+				token->kind = lookup.kind;
 
 				cursor += lookup.skip;
 
@@ -229,12 +289,8 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 
 					if (is_hex_float)
 					{
-						Token* token = VA_Push(token_array);
-						*token = (Token){
-							.kind   = Token_Float,
-							.len    = (u16)digit_count,
-							.offset = offset,
-						};
+						token->kind = Token_Float;
+						token->len  = (u16)digit_count;
 
 						Token_Data* token_data = VA_Push(token_array);
 
@@ -263,12 +319,8 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 						}
 						else
 						{
-							Token* token = VA_Push(token_array);
-							*token = (Token){
-								.kind   = Token_Int,
-								.len    = (u16)digit_count,
-								.offset = offset,
-							};
+							token->kind = Token_Int;
+							token->len  = (u16)digit_count;
 
 							Token_Data* token_data = VA_Push(token_array);
 							*token_data = (Token_Data){
@@ -310,12 +362,8 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 					{
 						if (digit_count <= 19)
 						{
-							Token* token = VA_Push(token_array);
-							*token = (Token){
-								.kind   = Token_Int,
-								.len    = (u16)digit_count,
-								.offset = offset,
-							};
+							token->kind = Token_Int;
+							token->len  = (u16)digit_count;
 
 							Token_Data* token_data = VA_Push(token_array);
 							*token_data = (Token_Data){
@@ -350,12 +398,8 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 
 							if (value_hi == 0)
 							{
-								Token* token = VA_Push(token_array);
-								*token = (Token){
-									.kind   = Token_Int,
-									.len    = (u16)digit_count,
-									.offset = offset,
-								};
+								token->kind = Token_Int;
+								token->len  = (u16)digit_count;
 
 								Token_Data* token_data = VA_Push(token_array);
 								*token_data = (Token_Data){
@@ -364,12 +408,8 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 							}
 							else
 							{
-								Token* token = VA_Push(token_array);
-								*token = (Token){
-									.kind   = Token_Int128,
-									.len    = (u16)digit_count,
-									.offset = offset,
-								};
+								token->kind = Token_Int128;
+								token->len  = (u16)digit_count;
 
 								Token_Data* token_data_lo = VA_Push(token_array);
 								*token_data_lo = (Token_Data){
@@ -492,12 +532,7 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 						// TODO: Replace with actual float parsing
 						f64 float_value = strtod(buffer, 0);
 
-						Token* token = VA_Push(token_array);
-						*token = (Token){
-							.kind   = Token_Float,
-							.len    = 0, // TODO: What to do with this?
-							.offset = offset,
-						};
+						token->kind = Token_Float;
 
 						Token_Data* token_data = VA_Push(token_array);
 						*token_data = (Token_Data){
@@ -647,12 +682,7 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 							}
 							else
 							{
-								Token* token = VA_Push(token_array);
-								*token = (Token){
-									.kind   = Token_Char,
-									.len    = 0,
-									.offset = offset,
-								};
+								token->kind = Token_Char;
 
 								// NOTE: This wastes 8 bytes but is not a problem since character literals are almost never used
 								Token_Data* token_data = VA_Push(token_array);
@@ -671,12 +701,8 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 							}
 							else
 							{
-								Token* token = VA_Push(token_array);
-								*token = (Token){
-									.kind   = Token_String,
-									.len    = (u16)string.len,
-									.offset = offset,
-								};
+								token->kind = Token_String;
+								token->len  = (u16)string.len;
 
 								Token_Data* token_data = VA_Push(token_array);
 								*token_data = (Token_Data){
@@ -688,13 +714,7 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 				}
 				else if (*cursor == 0)
 				{
-					Token* token = VA_Push(token_array);
-					*token = (Token){
-						.kind   = Token_EOF,
-						.len    = 0,
-						.offset = offset,
-					};
-
+					token->kind = Token_EOF;
 					break;
 				}
 				else
