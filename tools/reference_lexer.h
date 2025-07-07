@@ -11,8 +11,7 @@ RefLexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array
 {
 	ASSERT(input.len > REF_LEXER_ZPAD && IsZero(input.data + input.len-REF_LEXER_ZPAD, REF_LEXER_ZPAD));
 
-	// NOTE: 8 bytes per token, a token is less than 12 bytes on avg => len * 12/8 = len + len/2
-	VA_EnsureCommitted(token_array, input.len + input.len/2);
+	VA_EnsureCommitted(token_array, input.len/8);
 
 	Ref_Lexer lexer = (Ref_Lexer){
 		.contents = input.data,
