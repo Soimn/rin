@@ -54,25 +54,6 @@ FreeMemory(void* reserve_base)
 	VirtualFree(reserve_base, 0, MEM_RELEASE);
 }
 
-
-bool
-Char_IsDigit(u8 c)
-{
-	return ((u8)(c - '0') < (u8)10);
-}
-
-bool
-Char_IsAlpha(u8 c)
-{
-	return ((u8)((c & 0xDF) - 'A') <= (u8)('Z' - 'A'));
-}
-
-bool
-Char_IsHexAlpha(u8 c)
-{
-	return ((u8)((c & 0xDF) - 'A') <= (u8)('F' - 'A'));
-}
-
 u32
 WideStrLen(wchar_t* str)
 {

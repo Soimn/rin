@@ -1,100 +1,46 @@
 #define LEXER_ZPAD 65
 
-typedef struct Lexer_LUT_Entry
+typedef struct Lexer_LUT_Entry_Variant
 {
 	u16 kind;
 	u16 skip;
+} Lexer_LUT_Entry_Variant;
+
+typedef struct Lexer_LUT_Entry
+{
+	Lexer_LUT_Entry_Variant variant[4];
 } Lexer_LUT_Entry;
 
-#define DB 0x100
-#define EQ 0x80
-static Lexer_LUT_Entry Lexer_LUT[512] = {
-	['#']      = { Token_Pound,        1 },
-	['#' | DB] = { Token_Pound,        1 },
-	['#' | EQ] = { Token_Pound,        1 },
-	['$']      = { Token_Cash,         1 },
-	['$' | DB] = { Token_Cash,         1 },
-	['$' | EQ] = { Token_Cash,         1 },
-	['(']      = { Token_OpenParen,    1 },
-	['(' | DB] = { Token_OpenParen,    1 },
-	['(' | EQ] = { Token_OpenParen,    1 },
-	[')']      = { Token_CloseParen,   1 },
-	[')' | DB] = { Token_CloseParen,   1 },
-	[')' | EQ] = { Token_CloseParen,   1 },
-	[',']      = { Token_Comma,        1 },
-	[',' | DB] = { Token_Comma,        1 },
-	[',' | EQ] = { Token_Comma,        1 },
-	['.']      = { Token_Dot,          1 },
-	['.' | DB] = { Token_Dot,          1 },
-	['.' | EQ] = { Token_Dot,          1 },
-	[':']      = { Token_Colon,        1 },
-	[':' | DB] = { Token_Colon,        1 },
-	[':' | EQ] = { Token_Colon,        1 },
-	[';']      = { Token_Semicolon,    1 },
-	[';' | DB] = { Token_Semicolon,    1 },
-	[';' | EQ] = { Token_Semicolon,    1 },
-	['?']      = { Token_QMark,        1 },
-	['?' | DB] = { Token_QMark,        1 },
-	['?' | EQ] = { Token_QMark,        1 },
-	['@']      = { Token_At,           1 },
-	['@' | DB] = { Token_At,           1 },
-	['@' | EQ] = { Token_At,           1 },
-	['[']      = { Token_OpenBracket,  1 },
-	['[' | DB] = { Token_OpenBracket,  1 },
-	['[' | EQ] = { Token_OpenBracket,  1 },
-	[']']      = { Token_CloseBracket, 1 },
-	[']' | DB] = { Token_CloseBracket, 1 },
-	[']' | EQ] = { Token_CloseBracket, 1 },
-	['^']      = { Token_Hat,          1 },
-	['^' | DB] = { Token_Hat,          1 },
-	['^' | EQ] = { Token_Hat,          1 },
-	['{']      = { Token_OpenBrace,    1 },
-	['{' | DB] = { Token_OpenBrace,    1 },
-	['{' | EQ] = { Token_OpenBrace,    1 },
-	['}']      = { Token_CloseBrace,   1 },
-	['}' | DB] = { Token_CloseBrace,   1 },
-	['}' | EQ] = { Token_CloseBrace,   1 },
+static Lexer_LUT_Entry Lexer_LUT[256] = {
+	['#'] = { { { Token_Pound,        1 }, { Token_Pound,        1 }, { Token_Pound,        1 }, { Token_Pound,        1 } } },
+	['$'] = { { { Token_Cash,         1 }, { Token_Cash,         1 }, { Token_Cash,         1 }, { Token_Cash,         1 } } },
+	['('] = { { { Token_OpenParen,    1 }, { Token_OpenParen,    1 }, { Token_OpenParen,    1 }, { Token_OpenParen,    1 } } },
+	[')'] = { { { Token_CloseParen,   1 }, { Token_CloseParen,   1 }, { Token_CloseParen,   1 }, { Token_CloseParen,   1 } } },
+	[','] = { { { Token_Comma,        1 }, { Token_Comma,        1 }, { Token_Comma,        1 }, { Token_Comma,        1 } } },
+	['.'] = { { { Token_Dot,          1 }, { Token_Dot,          1 }, { Token_Dot,          1 }, { Token_Dot,          1 } } },
+	[':'] = { { { Token_Colon,        1 }, { Token_Colon,        1 }, { Token_Colon,        1 }, { Token_Colon,        1 } } },
+	[';'] = { { { Token_Semicolon,    1 }, { Token_Semicolon,    1 }, { Token_Semicolon,    1 }, { Token_Semicolon,    1 } } },
+	['?'] = { { { Token_QMark,        1 }, { Token_QMark,        1 }, { Token_QMark,        1 }, { Token_QMark,        1 } } },
+	['@'] = { { { Token_At,           1 }, { Token_At,           1 }, { Token_At,           1 }, { Token_At,           1 } } },
+	['['] = { { { Token_OpenBracket,  1 }, { Token_OpenBracket,  1 }, { Token_OpenBracket,  1 }, { Token_OpenBracket,  1 } } },
+	[']'] = { { { Token_CloseBracket, 1 }, { Token_CloseBracket, 1 }, { Token_CloseBracket, 1 }, { Token_CloseBracket, 1 } } },
+	['^'] = { { { Token_Hat,          1 }, { Token_Hat,          1 }, { Token_Hat,          1 }, { Token_Hat,          1 } } },
+	['{'] = { { { Token_OpenBrace,    1 }, { Token_OpenBrace,    1 }, { Token_OpenBrace,    1 }, { Token_OpenBrace,    1 } } },
+	['}'] = { { { Token_CloseBrace,   1 }, { Token_CloseBrace,   1 }, { Token_CloseBrace,   1 }, { Token_CloseBrace,   1 } } },
 
-	['%']           = { Token_Percent,    1 },
-	['%' | DB]      = { Token_Percent,    1 },
-	['%' | EQ]      = { Token_PercentEq,  2 },
-	['*']           = { Token_Star,       1 },
-	['*' | DB]      = { Token_Star,       1 },
-	['*' | EQ]      = { Token_StarEq,     2 },
-	['/']           = { Token_Slash,      1 },
-	['/' | DB]      = { Token_Slash,      1 },
-	['/' | EQ]      = { Token_SlashEq,    2 },
-	['~']           = { Token_Tilde,      1 },
-	['~' | DB]      = { Token_Tilde,      1 },
-	['~' | EQ]      = { Token_TildeEq,    2 },
-	['&']           = { Token_And,        1 },
-	['&' | DB]      = { Token_AndAnd,     2 },
-	['&' | EQ]      = { Token_AndEq,      2 },
-	['|']           = { Token_Or,         1 },
-	['|' | DB]      = { Token_OrOr,       2 },
-	['|' | EQ]      = { Token_OrEq,       2 },
-	['<']           = { Token_Lt,         1 },
-	['<' | DB]      = { Token_LtLt,       2 },
-	['<' | EQ]      = { Token_LtEq,       2 },
-	['>']           = { Token_Gt,         1 },
-	['>' | DB]      = { Token_GtGt,       2 },
-	['>' | EQ]      = { Token_GtEq,       2 },
-	['-']           = { Token_Minus,      1 },
-	['-' | DB]      = { Token_MinusMinus, 2 },
-	['-' | EQ]      = { Token_MinusEq,    2 },
-	['+']           = { Token_Plus,       1 },
-	['+' | DB]      = { Token_PlusPlus,   2 },
-	['+' | EQ]      = { Token_PlusEq,     2 },
-	['=']           = { Token_Eq,         1 },
-	['=' | EQ]      = { Token_EqEq,       2 },
-	['=' | DB]      = { Token_EqEq,       2 },
-	['=' | DB | EQ] = { Token_EqEq,       2 },
-	['!']           = { Token_Bang,       1 },
-	['!' | DB]      = { Token_Bang,       1 },
-	['!' | EQ]      = { Token_BangEq,     2 },
+	['%'] = { { { Token_Percent, 1 }, { Token_PercentEq, 2 }, { Token_Percent,    1 }, { Token_Percent, 1 } } },
+	['*'] = { { { Token_Star,    1 }, { Token_StarEq,    2 }, { Token_Star,       1 }, { Token_Star,    1 } } },
+	['/'] = { { { Token_Slash,   1 }, { Token_SlashEq,   2 }, { Token_Slash,      1 }, { Token_Slash,   1 } } },
+	['~'] = { { { Token_Tilde,   1 }, { Token_TildeEq,   2 }, { Token_Tilde,      1 }, { Token_Tilde,   1 } } },
+	['&'] = { { { Token_And,     1 }, { Token_AndEq,     2 }, { Token_AndAnd,     2 }, { Token_And,     1 } } },
+	['|'] = { { { Token_Or,      1 }, { Token_OrEq,      2 }, { Token_OrOr,       2 }, { Token_Or,      1 } } },
+	['<'] = { { { Token_Lt,      1 }, { Token_LtEq,      2 }, { Token_LtLt,       2 }, { Token_Lt,      1 } } },
+	['>'] = { { { Token_Gt,      1 }, { Token_GtEq,      2 }, { Token_GtGt,       2 }, { Token_Gt,      1 } } },
+	['-'] = { { { Token_Minus,   1 }, { Token_MinusEq,   2 }, { Token_MinusMinus, 2 }, { Token_Minus,   1 } } },
+	['+'] = { { { Token_Plus,    1 }, { Token_PlusEq,    2 }, { Token_PlusPlus,   2 }, { Token_Plus,    1 } } },
+	['='] = { { { Token_Eq,      1 }, { Token_EqEq,      2 }, { Token_EqEq,       2 }, { Token_EqEq,    2 } } },
+	['!'] = { { { Token_Bang,    1 }, { Token_BangEq,    2 }, { Token_Bang,       1 }, { Token_Bang,    1 } } },
 };
-#undef DB
-#undef EQ
 
 static bool
 LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, Token** first_token, u32* token_count)
@@ -225,23 +171,23 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 		}
 		else
 		{
-			u8 ch  = cursor[0];
+			u8 ch = cursor[0];
+			Lexer_LUT_Entry lookup = Lexer_LUT[ch];
+
 			u16 db = (cursor[1] == cursor[0]);
 			u16 eq = (cursor[1] == '=');
 
-			u16 mod = ((db + db + eq) << 7);
+			Lexer_LUT_Entry_Variant variant = lookup.variant[(db << 1) | eq];
 
-			Lexer_LUT_Entry lookup = Lexer_LUT[ch | mod];
-
-			if (lookup.kind != 0)
+			if (variant.kind != 0)
 			{
-				token->kind = lookup.kind;
+				token->kind = variant.kind;
 
-				cursor += lookup.skip;
+				cursor += variant.skip;
 
-				if ((lookup.kind == Token_GtGt || lookup.kind == Token_LtLt) && cursor[0] == '=')
+				if ((variant.kind == Token_GtGt || variant.kind == Token_LtLt) && cursor[0] == '=')
 				{
-					if (lookup.kind == Token_GtGt) token->kind = Token_GtGtEq;
+					if (variant.kind == Token_GtGt) token->kind = Token_GtGtEq;
 					else                           token->kind = Token_LtLtEq;
 					++cursor;
 				}

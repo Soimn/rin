@@ -52,3 +52,21 @@ static void FreeMemory(void* reserve_base);
 #define MAX(A, B) ((A) > (B) ? (A) : (B))
 
 #define FORCE_INLINE __forceinline
+
+FORCE_INLINE static bool
+Char_IsDigit(u8 c)
+{
+	return ((u8)(c - '0') < (u8)10);
+}
+
+FORCE_INLINE static bool
+Char_IsAlpha(u8 c)
+{
+	return ((u8)((c & 0xDF) - 'A') <= (u8)('Z' - 'A'));
+}
+
+FORCE_INLINE static bool
+Char_IsHexAlpha(u8 c)
+{
+	return ((u8)((c & 0xDF) - 'A') <= (u8)('F' - 'A'));
+}
