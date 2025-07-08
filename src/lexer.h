@@ -1,97 +1,91 @@
 #define LEXER_ZPAD 65
 
-typedef struct Lexer_LUT_Entry
-{
-	s16 kind;
-	u16 skip;
-} Lexer_LUT_Entry;
-
 #define DB 0x100
 #define EQ 0x80
-static Lexer_LUT_Entry Lexer_LUT[512] = {
-	['#']      = { -1, 1 },
-	['#' | DB] = { -1, 1 },
-	['#' | EQ] = { -1, 1 },
-	['$']      = { -1, 1 },
-	['$' | DB] = { -1, 1 },
-	['$' | EQ] = { -1, 1 },
-	['(']      = { -1, 1 },
-	['(' | DB] = { -1, 1 },
-	['(' | EQ] = { -1, 1 },
-	[')']      = { -1, 1 },
-	[')' | DB] = { -1, 1 },
-	[')' | EQ] = { -1, 1 },
-	[',']      = { -1, 1 },
-	[',' | DB] = { -1, 1 },
-	[',' | EQ] = { -1, 1 },
-	['.']      = { -1, 1 },
-	['.' | DB] = { -1, 1 },
-	['.' | EQ] = { -1, 1 },
-	[':']      = { -1, 1 },
-	[':' | DB] = { -1, 1 },
-	[':' | EQ] = { -1, 1 },
-	[';']      = { -1, 1 },
-	[';' | DB] = { -1, 1 },
-	[';' | EQ] = { -1, 1 },
-	['?']      = { -1, 1 },
-	['?' | DB] = { -1, 1 },
-	['?' | EQ] = { -1, 1 },
-	['@']      = { -1, 1 },
-	['@' | DB] = { -1, 1 },
-	['@' | EQ] = { -1, 1 },
-	['[']      = { -1, 1 },
-	['[' | DB] = { -1, 1 },
-	['[' | EQ] = { -1, 1 },
-	[']']      = { -1, 1 },
-	[']' | DB] = { -1, 1 },
-	[']' | EQ] = { -1, 1 },
-	['^']      = { -1, 1 },
-	['^' | DB] = { -1, 1 },
-	['^' | EQ] = { -1, 1 },
-	['{']      = { -1, 1 },
-	['{' | DB] = { -1, 1 },
-	['{' | EQ] = { -1, 1 },
-	['}']      = { -1, 1 },
-	['}' | DB] = { -1, 1 },
-	['}' | EQ] = { -1, 1 },
+static s16 Lexer_LUT[512] = {
+	['#']      = -1,
+	['#' | DB] = -1,
+	['#' | EQ] = -1,
+	['$']      = -1,
+	['$' | DB] = -1,
+	['$' | EQ] = -1,
+	['(']      = -1,
+	['(' | DB] = -1,
+	['(' | EQ] = -1,
+	[')']      = -1,
+	[')' | DB] = -1,
+	[')' | EQ] = -1,
+	[',']      = -1,
+	[',' | DB] = -1,
+	[',' | EQ] = -1,
+	['.']      = -1,
+	['.' | DB] = -1,
+	['.' | EQ] = -1,
+	[':']      = -1,
+	[':' | DB] = -1,
+	[':' | EQ] = -1,
+	[';']      = -1,
+	[';' | DB] = -1,
+	[';' | EQ] = -1,
+	['?']      = -1,
+	['?' | DB] = -1,
+	['?' | EQ] = -1,
+	['@']      = -1,
+	['@' | DB] = -1,
+	['@' | EQ] = -1,
+	['[']      = -1,
+	['[' | DB] = -1,
+	['[' | EQ] = -1,
+	[']']      = -1,
+	[']' | DB] = -1,
+	[']' | EQ] = -1,
+	['^']      = -1,
+	['^' | DB] = -1,
+	['^' | EQ] = -1,
+	['{']      = -1,
+	['{' | DB] = -1,
+	['{' | EQ] = -1,
+	['}']      = -1,
+	['}' | DB] = -1,
+	['}' | EQ] = -1,
 
-	['%']           = { Token_Percent,    1 },
-	['%' | DB]      = { Token_Percent,    1 },
-	['%' | EQ]      = { Token_PercentEq,  2 },
-	['*']           = { Token_Star,       1 },
-	['*' | DB]      = { Token_Star,       1 },
-	['*' | EQ]      = { Token_StarEq,     2 },
-	['/']           = { Token_Slash,      1 },
-	['/' | DB]      = { Token_Slash,      1 },
-	['/' | EQ]      = { Token_SlashEq,    2 },
-	['~']           = { Token_Tilde,      1 },
-	['~' | DB]      = { Token_Tilde,      1 },
-	['~' | EQ]      = { Token_TildeEq,    2 },
-	['&']           = { Token_And,        1 },
-	['&' | DB]      = { Token_AndAnd,     2 },
-	['&' | EQ]      = { Token_AndEq,      2 },
-	['|']           = { Token_Or,         1 },
-	['|' | DB]      = { Token_OrOr,       2 },
-	['|' | EQ]      = { Token_OrEq,       2 },
-	['<']           = { Token_Lt,         1 },
-	['<' | DB]      = { Token_LtLt,       2 },
-	['<' | EQ]      = { Token_LtEq,       2 },
-	['>']           = { Token_Gt,         1 },
-	['>' | DB]      = { Token_GtGt,       2 },
-	['>' | EQ]      = { Token_GtEq,       2 },
-	['-']           = { Token_Minus,      1 },
-	['-' | DB]      = { Token_MinusMinus, 2 },
-	['-' | EQ]      = { Token_MinusEq,    2 },
-	['+']           = { Token_Plus,       1 },
-	['+' | DB]      = { Token_PlusPlus,   2 },
-	['+' | EQ]      = { Token_PlusEq,     2 },
-	['=']           = { Token_Eq,         1 },
-	['=' | EQ]      = { Token_EqEq,       2 },
-	['=' | DB]      = { Token_EqEq,       2 },
-	['=' | DB | EQ] = { Token_EqEq,       2 },
-	['!']           = { Token_Bang,       1 },
-	['!' | DB]      = { Token_Bang,       1 },
-	['!' | EQ]      = { Token_BangEq,     2 },
+	['%']           = (Token_Percent    << 2) | 1,
+	['%' | DB]      = (Token_Percent    << 2) | 1,
+	['%' | EQ]      = (Token_PercentEq  << 2) | 2,
+	['*']           = (Token_Star       << 2) | 1,
+	['*' | DB]      = (Token_Star       << 2) | 1,
+	['*' | EQ]      = (Token_StarEq     << 2) | 2,
+	['/']           = (Token_Slash      << 2) | 1,
+	['/' | DB]      = (Token_Slash      << 2) | 1,
+	['/' | EQ]      = (Token_SlashEq    << 2) | 2,
+	['~']           = (Token_Tilde      << 2) | 1,
+	['~' | DB]      = (Token_Tilde      << 2) | 1,
+	['~' | EQ]      = (Token_TildeEq    << 2) | 2,
+	['&']           = (Token_And        << 2) | 1,
+	['&' | DB]      = (Token_AndAnd     << 2) | 2,
+	['&' | EQ]      = (Token_AndEq      << 2) | 2,
+	['|']           = (Token_Or         << 2) | 1,
+	['|' | DB]      = (Token_OrOr       << 2) | 2,
+	['|' | EQ]      = (Token_OrEq       << 2) | 2,
+	['<']           = (Token_Lt         << 2) | 1,
+	['<' | DB]      = (Token_LtLt       << 2) | 2,
+	['<' | EQ]      = (Token_LtEq       << 2) | 2,
+	['>']           = (Token_Gt         << 2) | 1,
+	['>' | DB]      = (Token_GtGt       << 2) | 2,
+	['>' | EQ]      = (Token_GtEq       << 2) | 2,
+	['-']           = (Token_Minus      << 2) | 1,
+	['-' | DB]      = (Token_MinusMinus << 2) | 2,
+	['-' | EQ]      = (Token_MinusEq    << 2) | 2,
+	['+']           = (Token_Plus       << 2) | 1,
+	['+' | DB]      = (Token_PlusPlus   << 2) | 2,
+	['+' | EQ]      = (Token_PlusEq     << 2) | 2,
+	['=']           = (Token_Eq         << 2) | 1,
+	['=' | EQ]      = (Token_EqEq       << 2) | 2,
+	['=' | DB]      = (Token_EqEq       << 2) | 2,
+	['=' | DB | EQ] = (Token_EqEq       << 2) | 2,
+	['!']           = (Token_Bang       << 2) | 1,
+	['!' | DB]      = (Token_Bang       << 2) | 1,
+	['!' | EQ]      = (Token_BangEq     << 2) | 2,
 };
 #undef DB
 #undef EQ
@@ -146,6 +140,9 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 
 					u32 mask = (star_mask << 1) & slash_mask;
 
+					unsigned long skip;
+					_BitScanForward(&skip, mask);
+
 					if (mask == 0)
 					{
 						cursor += 31; // NOTE: 31 in case of a * at the end of the register
@@ -153,8 +150,6 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 					}
 					else
 					{
-						unsigned long skip;
-						_BitScanForward(&skip, mask);
 						cursor += skip + 1;
 						break;
 					}
@@ -184,30 +179,28 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 		}
 
 		u8 ch  = cursor[0];
-		u16 db = (cursor[1] == ch);
-		u16 eq = (cursor[1] == '=');
+		u16 db = (cursor[1] == ch  ? 0x100 : 0);
+		u16 eq = (cursor[1] == '=' ?  0x80 : 0);
 
-		u16 mod = ((db + db + eq) << 7);
-
-		Lexer_LUT_Entry lookup = Lexer_LUT[ch | mod];
+		s16 lookup = Lexer_LUT[ch | db | eq];
 
 		Token* token = VA_Push(token_array);
 		token->offset = (u32)(cursor - input.data);
 
-		if (lookup.kind < 0)
+		if (lookup < 0)
 		{
 			token->kind = ch;
 			cursor     += 1;
 		}
-		else if (lookup.kind != 0)
+		else if (lookup != 0)
 		{
-			token->kind = lookup.kind;
+			token->kind = (u32)lookup >> 2;
 
-			cursor += lookup.skip;
+			cursor += lookup & 0x3;
 
-			if ((lookup.kind == Token_GtGt || lookup.kind == Token_LtLt) && cursor[0] == '=')
+			if ((token->kind == Token_GtGt || token->kind == Token_LtLt) && cursor[0] == '=')
 			{
-				if (lookup.kind == Token_GtGt) token->kind = Token_GtGtEq;
+				if (token->kind == Token_GtGt) token->kind = Token_GtGtEq;
 				else                           token->kind = Token_LtLtEq;
 				++cursor;
 			}
@@ -234,10 +227,22 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 				unsigned long skip;
 				if (_BitScanForward(&skip, mask+1))
 				{
-					token->kind = Token_Ident;
-					token->len  = (u16)skip;
-
 					cursor += skip;
+
+					// NOTE: based on this answer https://stackoverflow.com/a/77802924
+					__m256i index = _mm256_setr_epi8(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31);
+					__m256i cmp_mask = _mm256_cmpgt_epi8(_mm256_set1_epi8(skip), index);
+
+					c = _mm256_and_si256(c, cmp_mask);
+	
+					s32 j = -1;
+					for (s32 i = 0; i < (s32)ARRAY_LEN(TokenKind_Keywords); ++i)
+					{
+						j = (_mm256_movemask_epi8(_mm256_cmpeq_epi8(c, _mm256_load_si256((__m256i*)TokenKind_Keywords[i]))) == -1 ? i : j);
+					}
+
+					token->kind = (j == -1 ? Token_Ident : Token__FirstKeyword + j);
+					token->len  = (u16)skip;
 				}
 				else
 				{

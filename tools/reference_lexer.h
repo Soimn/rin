@@ -72,6 +72,23 @@ RefLexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array
 				.len    = (u16)len,
 				.offset = offset,
 			};
+
+			String ident = (String){ .data = input.data + offset, .len = len };
+
+			for (umm i = 0; i < ARRAY_LEN(TokenKind_Keywords); ++i)
+			{
+				u8* keyword = TokenKind_Keywords[i];
+				u32 keyword_len = 0;
+				for (u8* scan = keyword; *scan != 0; ++scan) ++keyword_len;
+
+				String keyword_string = (String){ .data = keyword, .len = keyword_len };
+
+				if (String_Equal(ident, keyword_string))
+				{
+					token->kind = (u16)(Token__FirstKeyword + i);
+					break;
+				}
+			}
 		}
 		else if (lexer.cursor[0] == '0' && (lexer.cursor[1] == 'x' || lexer.cursor[1] == 'h'))
 		{

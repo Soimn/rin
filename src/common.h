@@ -70,3 +70,16 @@ Char_IsHexAlpha(u8 c)
 {
 	return ((u8)((c & 0xDF) - 'A') <= (u8)('F' - 'A'));
 }
+
+static bool
+String_Equal(String a, String b)
+{
+	bool result = (a.len == b.len);
+
+	for (umm i = 0; i < a.len && result; ++i)
+	{
+		result = (a.data[i] == b.data[i]);
+	}
+
+	return result;
+}

@@ -16,7 +16,7 @@ set "common_compile_options= /nologo /W4 /arch:AVX2 /wd4201"
 set "common_link_options= /incremental:no /opt:ref /subsystem:console"
 
 if "%1"=="debug" (
-	set "compile_options=%common_compile_options% /Od /Z7 /Zo /RTC1"
+	set "compile_options=%common_compile_options% /Od /Oi /Z7 /Zo /RTC1"
 	set "link_options=%common_link_options% /DEBUG:FULL libucrtd.lib libvcruntimed.lib"
 ) else if "%1"=="release" (
 	set "compile_options=%common_compile_options% /O2 /Z7 /Zo"
