@@ -91,16 +91,16 @@ static s16 Lexer_LUT[512] = {
 #undef EQ
 
 static __declspec(align(32)) u8 Lexer__Keywords[][32] = {
-#define FIRST_KEYWORD(T, S) [T - Token__FirstKeyword] = S,
-#define REMAINING_KEYWORDS(T, S) [T - Token__FirstKeyword] = S,
+#define FIRST_KEYWORD(T, C0, C1, S) [T - Token__FirstKeyword] = S,
+#define REMAINING_KEYWORDS(T, C0, C1, S) [T - Token__FirstKeyword] = S,
 	KEYWORD_LIST
 #undef FIRST_KEYWORD
 #undef REMAINING_KEYWORDS
 };
 
 static u8 Lexer__KeywordLut[32][32] = {
-#define FIRST_KEYWORD(T, S) [(S)[0] - 'a'][(S)[1] - 'a'] = T - Token__FirstKeyword,
-#define REMAINING_KEYWORDS(T, S) [(S)[0] - 'a'][(S)[1] - 'a'] = T - Token__FirstKeyword,
+#define FIRST_KEYWORD(T, C0, C1, S) [C0 - 'a'][C1 - 'a'] = T - Token__FirstKeyword,
+#define REMAINING_KEYWORDS(T, C0, C1, S) [C0 - 'a'][C1 - 'a'] = T - Token__FirstKeyword,
 	KEYWORD_LIST
 #undef FIRST_KEYWORD
 #undef REMAINING_KEYWORDS
@@ -250,13 +250,13 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 					// NOTE: based on this answer https://stackoverflow.com/a/77802924
 					__m256i index = _mm256_setr_epi8( 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
 							                             16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31);
-					__m256i cmp_mask = _mm256_cmpgt_epi8(_mm256_set1_epi8(skip), index);
+					__m256i cmp_mask = _mm256_cmpgt_epi8(_mm256_set1_epi8((u8)skip), index);
 
 					c = _mm256_and_si256(c, cmp_mask);
 
 					int match_mask = _mm256_movemask_epi8(_mm256_cmpeq_epi8(c, _mm256_load_si256((__m256i*)Lexer__Keywords[keyword_idx])));
 
-					token->kind = (match_mask == -1 ? Token__FirstKeyword + keyword_idx : Token_Ident);
+					token->kind = (match_mask == -1 ? (u16)(Token__FirstKeyword + keyword_idx) : Token_Ident);
 					token->len  = (u16)skip;
 				}
 				else
@@ -644,7 +644,7 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 				{
 					String raw = {
 						.data = start+1, // NOTE: start + 1 to skip the leading "
-						.len  = cursor - (start+1),
+						.len  = (u16)(cursor - (start+1)),
 					};
 
 					++cursor; // NOTE: Skip ending "

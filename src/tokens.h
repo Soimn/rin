@@ -6,25 +6,25 @@
 #define TOKEN_KIND__IS_ASS(K) ((umm)((K) - Token__FirstBinaryAssignment) < (umm)(Token__PastLastBinaryAssignment - Token__FirstBinaryAssignment))
 
 #define KEYWORD_LIST                             \
-	FIRST_KEYWORD(     Token_Asm,      "asm")      \
-	REMAINING_KEYWORDS(Token_Break,    "break")    \
-	REMAINING_KEYWORDS(Token_Case,     "case")     \
-	REMAINING_KEYWORDS(Token_Continue, "continue") \
-	REMAINING_KEYWORDS(Token_Defer,    "defer")    \
-	REMAINING_KEYWORDS(Token_Else,     "else")     \
-	REMAINING_KEYWORDS(Token_Enum,     "enum")     \
-	REMAINING_KEYWORDS(Token_False,    "false")    \
-	REMAINING_KEYWORDS(Token_For,      "for")      \
-	REMAINING_KEYWORDS(Token_If,       "if")       \
-	REMAINING_KEYWORDS(Token_In,       "in")       \
-	REMAINING_KEYWORDS(Token_Proc,     "proc")     \
-	REMAINING_KEYWORDS(Token_Return,   "return")   \
-	REMAINING_KEYWORDS(Token_Struct,   "struct")   \
-	REMAINING_KEYWORDS(Token_Switch,   "switch")   \
-	REMAINING_KEYWORDS(Token_True,     "true")     \
-	REMAINING_KEYWORDS(Token_Union,    "union")    \
-	REMAINING_KEYWORDS(Token_Using,    "using")    \
-	REMAINING_KEYWORDS(Token_When,     "when")     \
+	FIRST_KEYWORD(     Token_Asm,      'a', 's', "asm")      \
+	REMAINING_KEYWORDS(Token_Break,    'b', 'r', "break")    \
+	REMAINING_KEYWORDS(Token_Case,     'c', 'a', "case")     \
+	REMAINING_KEYWORDS(Token_Continue, 'c', 'o', "continue") \
+	REMAINING_KEYWORDS(Token_Defer,    'd', 'e', "defer")    \
+	REMAINING_KEYWORDS(Token_Else,     'e', 'l', "else")     \
+	REMAINING_KEYWORDS(Token_Enum,     'e', 'n', "enum")     \
+	REMAINING_KEYWORDS(Token_False,    'f', 'a', "false")    \
+	REMAINING_KEYWORDS(Token_For,      'f', 'o', "for")      \
+	REMAINING_KEYWORDS(Token_If,       'i', 'f', "if")       \
+	REMAINING_KEYWORDS(Token_In,       'i', 'n', "in")       \
+	REMAINING_KEYWORDS(Token_Proc,     'p', 'r', "proc")     \
+	REMAINING_KEYWORDS(Token_Return,   'r', 'e', "return")   \
+	REMAINING_KEYWORDS(Token_Struct,   's', 't', "struct")   \
+	REMAINING_KEYWORDS(Token_Switch,   's', 'w', "switch")   \
+	REMAINING_KEYWORDS(Token_True,     't', 'r', "true")     \
+	REMAINING_KEYWORDS(Token_Union,    'u', 'n', "union")    \
+	REMAINING_KEYWORDS(Token_Using,    'u', 's', "using")    \
+	REMAINING_KEYWORDS(Token_When,     'w', 'h', "when")     \
 
 typedef enum Token_Kind
 {
@@ -114,8 +114,8 @@ typedef enum Token_Kind
 	Token__PastLastBinaryAssignment,
 
 	Token__FirstKeyword,
-#define FIRST_KEYWORD(T, S) T = Token__FirstKeyword,
-#define REMAINING_KEYWORDS(T, S) T,
+#define FIRST_KEYWORD(T, C0, C1, S) T = Token__FirstKeyword,
+#define REMAINING_KEYWORDS(T, C0, C1, S) T,
 	KEYWORD_LIST
 #undef FIRST_KEYWORD
 #undef REMAINING_KEYWORDS
@@ -123,8 +123,8 @@ typedef enum Token_Kind
 } Token_Kind;
 
 struct { String token_name; String keyword; } TokenKind_KeywordStrings[] = {
-#define FIRST_KEYWORD(T, S) { .token_name = MS_STRING(STRINGIFY(T)), .keyword = MS_STRING(S) },
-#define REMAINING_KEYWORDS(T, S) { .token_name = MS_STRING(STRINGIFY(T)), .keyword = MS_STRING(S) },
+#define FIRST_KEYWORD(T, C0, C1, S) { .token_name = MS_STRING(STRINGIFY(T)), .keyword = MS_STRING(S) },
+#define REMAINING_KEYWORDS(T, C0, C1, S) { .token_name = MS_STRING(STRINGIFY(T)), .keyword = MS_STRING(S) },
 	KEYWORD_LIST
 #undef FIRST_KEYWORD
 #undef REMAINING_KEYWORDS

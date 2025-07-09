@@ -73,7 +73,7 @@ RefLexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array
 				.offset = offset,
 			};
 
-			String ident = (String){ .data = input.data + offset, .len = len };
+			String ident = (String){ .data = input.data + offset, .len = (u16)len };
 
 			for (umm i = 0; i < ARRAY_LEN(TokenKind_KeywordStrings); ++i)
 			{
@@ -122,7 +122,7 @@ RefLexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array
 				{
 					*token = (Token){
 						.kind   = Token_Float,
-						.len    = digit_count,
+						.len    = (u16)digit_count,
 						.offset = offset,
 					};
 
@@ -132,7 +132,7 @@ RefLexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array
 				{
 					*token = (Token){
 						.kind   = Token_Float,
-						.len    = digit_count,
+						.len    = (u16)digit_count,
 						.offset = offset,
 					};
 
@@ -155,7 +155,7 @@ RefLexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array
 				{
 					*token = (Token){
 						.kind   = Token_Int,
-						.len    = digit_count,
+						.len    = (u16)digit_count,
 						.offset = offset,
 					};
 
@@ -281,7 +281,7 @@ RefLexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array
 				{
 					*token = (Token){
 						.kind   = Token_Int,
-						.len    = digit_count,
+						.len    = (u16)digit_count,
 						.offset = offset,
 					};
 
@@ -309,7 +309,7 @@ RefLexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array
 					{
 						*token = (Token){
 							.kind   = Token_Int,
-							.len    = digit_count,
+							.len    = (u16)digit_count,
 							.offset = offset,
 						};
 
@@ -319,7 +319,7 @@ RefLexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array
 					{
 						*token = (Token){
 							.kind   = Token_Int128,
-							.len    = digit_count,
+							.len    = (u16)digit_count,
 							.offset = offset,
 						};
 

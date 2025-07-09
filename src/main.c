@@ -29,6 +29,7 @@
 
 #include <immintrin.h>
 #include <stdint.h>
+#include <stdlib.h> // used for strtod
 
 #include "common.h"
 #include "memory.h"
