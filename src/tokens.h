@@ -6,19 +6,25 @@
 #define TOKEN_KIND__IS_ASS(K) ((umm)((K) - Token__FirstBinaryAssignment) < (umm)(Token__PastLastBinaryAssignment - Token__FirstBinaryAssignment))
 
 #define KEYWORD_LIST                             \
-	FIRST_KEYWORD(     Token_True,     "true")     \
-	REMAINING_KEYWORDS(Token_False,    "false")    \
-	REMAINING_KEYWORDS(Token_If,       "if")       \
-	REMAINING_KEYWORDS(Token_Else,     "else")     \
-	REMAINING_KEYWORDS(Token_While,    "while")    \
+	FIRST_KEYWORD(     Token_Asm,      "asm")      \
 	REMAINING_KEYWORDS(Token_Break,    "break")    \
+	REMAINING_KEYWORDS(Token_Case,     "case")     \
 	REMAINING_KEYWORDS(Token_Continue, "continue") \
+	REMAINING_KEYWORDS(Token_Defer,    "defer")    \
+	REMAINING_KEYWORDS(Token_Else,     "else")     \
+	REMAINING_KEYWORDS(Token_Enum,     "enum")     \
+	REMAINING_KEYWORDS(Token_False,    "false")    \
 	REMAINING_KEYWORDS(Token_For,      "for")      \
-	REMAINING_KEYWORDS(Token_Return,   "return")   \
+	REMAINING_KEYWORDS(Token_If,       "if")       \
+	REMAINING_KEYWORDS(Token_In,       "in")       \
 	REMAINING_KEYWORDS(Token_Proc,     "proc")     \
+	REMAINING_KEYWORDS(Token_Return,   "return")   \
 	REMAINING_KEYWORDS(Token_Struct,   "struct")   \
+	REMAINING_KEYWORDS(Token_Switch,   "switch")   \
+	REMAINING_KEYWORDS(Token_True,     "true")     \
 	REMAINING_KEYWORDS(Token_Union,    "union")    \
 	REMAINING_KEYWORDS(Token_Using,    "using")    \
+	REMAINING_KEYWORDS(Token_When,     "when")     \
 
 typedef enum Token_Kind
 {
@@ -116,9 +122,9 @@ typedef enum Token_Kind
 	Token__PastLastKeyword,
 } Token_Kind;
 
-static __declspec(align(32)) u8 TokenKind_Keywords[][32] = {
-#define FIRST_KEYWORD(T, S) S,
-#define REMAINING_KEYWORDS(T, S) S,
+struct { String token_name; String keyword; } TokenKind_KeywordStrings[] = {
+#define FIRST_KEYWORD(T, S) { .token_name = MS_STRING(STRINGIFY(T)), .keyword = MS_STRING(S) },
+#define REMAINING_KEYWORDS(T, S) { .token_name = MS_STRING(STRINGIFY(T)), .keyword = MS_STRING(S) },
 	KEYWORD_LIST
 #undef FIRST_KEYWORD
 #undef REMAINING_KEYWORDS
@@ -291,12 +297,7 @@ TokenKind__ToString(Token_Kind kind)
 		{
 			if (kind >= Token__FirstKeyword && kind < Token__PastLastKeyword)
 			{
-				u8* keyword = TokenKind_Keywords[kind - Token__FirstKeyword];
-
-				u32 len = 0;
-				for (u8* scan = keyword; *scan != 0; ++scan) ++len;
-
-				return (String){ .data = keyword, .len = len };
+				return TokenKind_KeywordStrings[kind - Token__FirstKeyword].token_name;
 			}
 			else return STRING("NOT_A_TOKEN");
 		} break;

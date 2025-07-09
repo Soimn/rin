@@ -46,6 +46,8 @@ static void FreeMemory(void* reserve_base);
 #define ALIGN(N, A) (((umm)(N) + (umm)(A)-1) & (umm)-(smm)(A))
 #define PAGE_SIZE 4096
 
+#define STRINGIFY(S) #S
+
 #define ARRAY_LEN(A) (sizeof(A) / sizeof(0[A]))
 
 #define MIN(A, B) ((A) < (B) ? (A) : (B))

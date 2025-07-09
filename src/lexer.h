@@ -90,6 +90,22 @@ static s16 Lexer_LUT[512] = {
 #undef DB
 #undef EQ
 
+static __declspec(align(32)) u8 Lexer__Keywords[][32] = {
+#define FIRST_KEYWORD(T, S) [T - Token__FirstKeyword] = S,
+#define REMAINING_KEYWORDS(T, S) [T - Token__FirstKeyword] = S,
+	KEYWORD_LIST
+#undef FIRST_KEYWORD
+#undef REMAINING_KEYWORDS
+};
+
+static u8 Lexer__KeywordLut[32][32] = {
+#define FIRST_KEYWORD(T, S) [(S)[0] - 'a'][(S)[1] - 'a'] = T - Token__FirstKeyword,
+#define REMAINING_KEYWORDS(T, S) [(S)[0] - 'a'][(S)[1] - 'a'] = T - Token__FirstKeyword,
+	KEYWORD_LIST
+#undef FIRST_KEYWORD
+#undef REMAINING_KEYWORDS
+};
+
 static bool
 LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, Token** first_token, u32* token_count)
 {
@@ -234,14 +250,12 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 					__m256i cmp_mask = _mm256_cmpgt_epi8(_mm256_set1_epi8(skip), index);
 
 					c = _mm256_and_si256(c, cmp_mask);
-	
-					s32 j = -1;
-					for (s32 i = 0; i < (s32)ARRAY_LEN(TokenKind_Keywords); ++i)
-					{
-						j = (_mm256_movemask_epi8(_mm256_cmpeq_epi8(c, _mm256_load_si256((__m256i*)TokenKind_Keywords[i]))) == -1 ? i : j);
-					}
 
-					token->kind = (j == -1 ? Token_Ident : Token__FirstKeyword + j);
+					umm keyword_idx = Lexer__KeywordLut[((u8*)&c)[0] - 'a'][((u8*)&c)[1] - 'a'];
+
+					int match_mask = _mm256_movemask_epi8(_mm256_cmpeq_epi8(c, _mm256_load_si256((__m256i*)Lexer__Keywords[keyword_idx])));
+
+					token->kind = (match_mask == -1 ? Token__FirstKeyword + keyword_idx : Token_Ident);
 					token->len  = (u16)skip;
 				}
 				else
