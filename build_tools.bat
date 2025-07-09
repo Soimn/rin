@@ -29,7 +29,6 @@ if "%2" neq "" goto invalid_arguments
 
 cl %compile_options% ..\tools\create_lexer_test.c /link %link_options% /pdb:create_lexer_test.pdb /out:create_lexer_test.exe
 clang-cl %compile_options% ..\tools\run_lexer_test.c /link %link_options% /pdb:run_lexer_test.pdb /out:run_lexer_test.exe
-clang-cl %compile_options% ..\tools\keyword_hash.c /link %link_options% /pdb:keyword_hash.pdb /out:keyword_hash.exe
 
 goto end
 

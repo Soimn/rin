@@ -167,7 +167,7 @@ wmain(int argc, wchar_t** argv)
 		Token* tokens   = 0;
 		u32 token_count = 0;
 
-#if 1
+#if 0
 		Virtual_Array token_array  = VA_Create(sizeof(Token), 3ULL << 30, 1024);
 		Virtual_Array string_array = VA_Create(sizeof(u8), 1ULL << 30, 256);
 
