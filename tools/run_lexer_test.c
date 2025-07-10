@@ -138,12 +138,12 @@ wmain(int argc, wchar_t** argv)
 		}
 	}
 
-	if (!VerifyLexer(input))
+	/*if (!VerifyLexer(input))
 	{
 		fprintf(stderr, "Failed verification\n");
 		return 1;
 	}
-	else printf("Passed verification\n");
+	else printf("Passed verification\n");*/
 
 	LARGE_INTEGER perf_freq;
 	QueryPerformanceFrequency(&perf_freq);

@@ -367,12 +367,6 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 							.integer = value,
 						};
 					}
-					else if (digit_count > 32)
-					{
-						//// ERROR: Hex int is too large to fit in 128 bits
-						__debugbreak();
-						return false;
-					}
 					else
 					{
 						u64 value_lo = 0;
@@ -380,21 +374,23 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 
 						for (u8* scan = start; scan != cursor; ++scan)
 						{
-							if (Char_IsDigit(*cursor))
+							if (*scan == '_') continue;
+
+							if (value_hi & (0xFULL << 60))
 							{
-								value_hi <<= 4;
-								value_hi  |= value_lo >> 60;
-								value_lo <<= 4;
-								value_lo  |= *scan & 0xF;
+								//// ERROR: Integer literal is too large to fit in 128 bits
+								__debugbreak();
+								return false;
 							}
-							else if (Char_IsHexAlpha(*cursor))
-							{
-								value_hi <<= 4;
-								value_hi  |= value_lo >> 60;
-								value_lo <<= 4;
-								value_lo  |= 9 + (*scan & 0x1F);
-							}
+
+							value_hi <<= 4;
+							value_hi  |= value_lo >> 60;
+							value_lo <<= 4;
+
+							if (Char_IsDigit(*cursor)) value_lo |= *scan & 0xF;
+							else                       value_lo |= 9 + (*scan & 0x1F);
 						}
+
 						token->kind = Token_Int128;
 						token->len  = (u16)digit_count;
 
@@ -421,8 +417,7 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 				{
 					if (Char_IsDigit(*cursor))
 					{
-						value *= 10;
-						value += *cursor&0xF;
+						value = value*10 + (*cursor&0xF);
 						++digit_count;
 						++cursor;
 					}
@@ -508,81 +503,67 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 				{
 					ASSERT(*cursor == '.');
 
-					char buffer[128];
-					umm buf_cur = 0;
+					cursor = start;
 
-					for (u8* scan = start; scan != cursor && buf_cur < ARRAY_LEN(buffer); ++scan)
-					{
-						if (*scan != '_')
-						{
-							buffer[buf_cur++] = *scan;
-						}
-					}
+					u64 digits_lo = 0;
+					u64 digits_hi = 0;
 
-					if (buf_cur < ARRAY_LEN(buffer))
-					{
-						buffer[buf_cur++] = '.';
-					}
-					++cursor;
+					while (*cursor == '0') ++cursor;
 
-					umm fraction_digit_count = 0;
+					digit_count = 0;
+					smm digits_before_decimal_point = -1;
 
 					for (;;)
 					{
 						if (Char_IsDigit(*cursor))
 						{
-							if (buf_cur < ARRAY_LEN(buffer))
-							{
-								buffer[buf_cur++] = *cursor;
-							}
+							u64 digits_lo_hi;
+							digits_lo = _umul128(digits_lo, 10, &digits_lo_hi);
+							digits_hi = _umul128(digits_hi, 10, &(u64){0});
 
-							++fraction_digit_count;
+							u8 c1 = _addcarry_u64(0, digits_lo, *cursor&0xF, &digits_lo);
+							_addcarry_u64(c1, digits_hi, digits_lo_hi, &digits_hi);
+
+							++digit_count;
 							++cursor;
 						}
 						else if (*cursor == '_')
 						{
 							++cursor;
 						}
+						else if (*cursor == '.' && digits_before_decimal_point == -1)
+						{
+							digits_before_decimal_point = (smm)digit_count;
+							++cursor;
+						}
 						else break;
 					}
 
-					if (fraction_digit_count == 0)
+					if (digit_count > 38)
 					{
-						//// ERROR: Missing digits in float fractional part
+						//// ERROR: Too many digits in floating point literal
 						__debugbreak();
 						return false;
 					}
 
+					ASSERT(digits_before_decimal_point >= 0);
+					umm digits_after_decimal_point = (digit_count - (umm)digits_before_decimal_point);
+
+					s64 exponent = 0;
+					bool exponent_is_negative = false;
 					if ((*cursor&0xDF) == 'E')
 					{
-						if (buf_cur < ARRAY_LEN(buffer))
-						{
-							buffer[buf_cur++] = 'e';
-						}
-
 						++cursor;
 
-						if (*cursor == '+' || *cursor == '-')
-						{
-							if (buf_cur < ARRAY_LEN(buffer))
-							{
-								buffer[buf_cur++] = *cursor;
-							}
-
-							++cursor;
-						}
+						exponent_is_negative = (*cursor == '-');
+						if (*cursor == '-' || *cursor == '+') ++cursor;
 
 						umm exponent_digit_count = 0;
-
 						for (;;)
 						{
 							if (Char_IsDigit(*cursor))
 							{
-								if (buf_cur < ARRAY_LEN(buffer))
-								{
-									buffer[buf_cur++] = *cursor;
-								}
-
+								exponent = exponent*10 + (*cursor&0xF);
 								++exponent_digit_count;
 								++cursor;
 							}
@@ -593,28 +574,40 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 							else break;
 						}
 
-						if (exponent_digit_count == 0)
+						if (exponent_digit_count > 17)
 						{
-							//// ERROR: Missing digits in float exponent part
+							//// ERROR: Too many digits in floating point exponent
+							__debugbreak();
+							return false;
+						}
+					}
+					
+					exponent = (exponent_is_negative ? -exponent : exponent) - digits_after_decimal_point;
+					
+					// based on the explanation of the Eisel-Lemire algorithm by https://nigeltao.github.io/blog/2020/eisel-lemire.html
+					f64 float_value = 0;
+					{
+						if (digits_hi == 0 && digits_lo < (1ULL << 53) && exponent >= -22 && exponent <= 22)
+						{
+							static f64 small_powers_of_10[23] = {
+								1.0e00, 1.0e01, 1.0e02, 1.0e03, 1.0e04, 1.0e05, 1.0e06, 1.0e07, 1.0e08,
+								1.0e09, 1.0e10, 1.0e11, 1.0e12, 1.0e13, 1.0e14, 1.0e15, 1.0e16, 1.0e17,
+								1.0e18, 1.0e19, 1.0e20, 1.0e21, 1.0e22,
+							};
+
+							if (exponent < 0) float_value = (f64)digits_lo/small_powers_of_10[-exponent];
+							else              float_value = (f64)digits_lo*small_powers_of_10[exponent];
+						}
+						else
+						{
+							//// ERROR: Failed to parse float
 							__debugbreak();
 							return false;
 						}
 					}
 
-					if (buf_cur == ARRAY_LEN(buffer))
-					{
-						//// ERROR: Loong loooooong maaaaaaaaaaaaaaaaaaaaaaaan
-						__debugbreak();
-						return false;
-					}
-
-					buffer[buf_cur++] = 0;
-
-					// TODO: Replace with actual float parsing
-					f64 float_value = strtod(buffer, 0);
-
 					token->kind = Token_Float;
-
+					
 					Token_Data* token_data = VA_Push(token_array);
 					*token_data = (Token_Data){
 						.floating = float_value,
