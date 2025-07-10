@@ -130,6 +130,8 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 	__m256i slash        = _mm256_set1_epi8('/');
 	__m256i star         = _mm256_set1_epi8('*');
 	__m256i newline      = _mm256_set1_epi8('\n');
+	__m256i indexes      = _mm256_setr_epi8( 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
+							                             16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31);
 
 	for (;;)
 	{
@@ -234,6 +236,9 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 			{
 				__m256i c = _mm256_loadu_si256((__m256i*)cursor);
 
+				umm keyword_idx = Lexer__KeywordLut[((u8*)&c)[0] - 'a'][((u8*)&c)[1] - 'a'];
+				__m256i keyword = _mm256_load_si256((__m256i*)Lexer__Keywords[keyword_idx]);
+
 				u32 alpha_mask = _mm256_movemask_epi8(_mm256_cmpgt_epi8(_mm256_add_epi8(_mm256_and_si256(c, hex_df), alpha_bias), alpha_thresh));
 				u32 digit_mask = _mm256_movemask_epi8(_mm256_cmpgt_epi8(_mm256_add_epi8(c, digit_bias), digit_thresh));
 				u32 under_mask = _mm256_movemask_epi8(_mm256_cmpeq_epi8(c, underscore));
@@ -245,16 +250,9 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 				{
 					cursor += skip;
 
-					umm keyword_idx = Lexer__KeywordLut[((u8*)&c)[0] - 'a'][((u8*)&c)[1] - 'a'];
-
 					// NOTE: based on this answer https://stackoverflow.com/a/77802924
-					__m256i index = _mm256_setr_epi8( 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
-							                             16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31);
-					__m256i cmp_mask = _mm256_cmpgt_epi8(_mm256_set1_epi8((u8)skip), index);
-
-					c = _mm256_and_si256(c, cmp_mask);
-
-					int match_mask = _mm256_movemask_epi8(_mm256_cmpeq_epi8(c, _mm256_load_si256((__m256i*)Lexer__Keywords[keyword_idx])));
+					__m256i cmp_mask = _mm256_cmpgt_epi8(_mm256_set1_epi8((u8)skip), indexes);
+					int match_mask = _mm256_movemask_epi8(_mm256_cmpeq_epi8(_mm256_and_si256(c, cmp_mask), keyword));
 
 					token->kind = (match_mask == -1 ? (u16)(Token__FirstKeyword + keyword_idx) : Token_Ident);
 					token->len  = (u16)skip;
