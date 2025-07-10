@@ -1,5 +1,6 @@
 #include "common.h"
 #include <immintrin.h>
+#include "../src/float_parsing.h"
 #include "../src/memory.h"
 #include "../src/virtual_array.h"
 #include "../src/tokens.h"
@@ -138,12 +139,12 @@ wmain(int argc, wchar_t** argv)
 		}
 	}
 
-	/*if (!VerifyLexer(input))
+	if (!VerifyLexer(input))
 	{
 		fprintf(stderr, "Failed verification\n");
 		return 1;
 	}
-	else printf("Passed verification\n");*/
+	else printf("Passed verification\n");
 
 	LARGE_INTEGER perf_freq;
 	QueryPerformanceFrequency(&perf_freq);
@@ -167,7 +168,7 @@ wmain(int argc, wchar_t** argv)
 		Token* tokens   = 0;
 		u32 token_count = 0;
 
-#if 0
+#if 1
 		Virtual_Array token_array  = VA_Create(sizeof(Token), 3ULL << 30, 1024);
 		Virtual_Array string_array = VA_Create(sizeof(u8), 1ULL << 30, 256);
 

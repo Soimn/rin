@@ -29,9 +29,9 @@
 
 #include <immintrin.h>
 #include <stdint.h>
-#include <stdlib.h> // used for strtod
 
 #include "common.h"
+#include "float_parsing.h"
 #include "memory.h"
 #include "virtual_array.h"
 #include "tokens.h"

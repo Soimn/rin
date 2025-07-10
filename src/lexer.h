@@ -505,113 +505,47 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 
 					cursor = start;
 
-					u64 digits_lo = 0;
-					u64 digits_hi = 0;
-
-					while (*cursor == '0') ++cursor;
-
-					digit_count = 0;
-					smm digits_before_decimal_point = -1;
-
-					for (;;)
-					{
-						if (Char_IsDigit(*cursor))
-						{
-							u64 digits_lo_hi;
-							digits_lo = _umul128(digits_lo, 10, &digits_lo_hi);
-							digits_hi = _umul128(digits_hi, 10, &(u64){0});
-
-							u8 c1 = _addcarry_u64(0, digits_lo, *cursor&0xF, &digits_lo);
-							_addcarry_u64(c1, digits_hi, digits_lo_hi, &digits_hi);
-
-							++digit_count;
-							++cursor;
-						}
-						else if (*cursor == '_')
-						{
-							++cursor;
-						}
-						else if (*cursor == '.' && digits_before_decimal_point == -1)
-						{
-							digits_before_decimal_point = (smm)digit_count;
-							++cursor;
-						}
-						else break;
-					}
-
-					if (digit_count > 38)
-					{
-						//// ERROR: Too many digits in floating point literal
-						__debugbreak();
-						return false;
-					}
-
-					ASSERT(digits_before_decimal_point >= 0);
-					umm digits_after_decimal_point = (digit_count - (umm)digits_before_decimal_point);
-
-					s64 exponent = 0;
-					bool exponent_is_negative = false;
-					if ((*cursor&0xDF) == 'E')
-					{
-						++cursor;
-
-						exponent_is_negative = (*cursor == '-');
-						if (*cursor == '-' || *cursor == '+') ++cursor;
-
-						umm exponent_digit_count = 0;
-						for (;;)
-						{
-							if (Char_IsDigit(*cursor))
-							{
-								exponent = exponent*10 + (*cursor&0xF);
-								++exponent_digit_count;
-								++cursor;
-							}
-							else if (*cursor == '_')
-							{
-								++cursor;
-							}
-							else break;
-						}
-
-						if (exponent_digit_count > 17)
-						{
-							//// ERROR: Too many digits in floating point exponent
-							__debugbreak();
-							return false;
-						}
-					}
-					
-					exponent = (exponent_is_negative ? -exponent : exponent) - digits_after_decimal_point;
-					
-					// based on the explanation of the Eisel-Lemire algorithm by https://nigeltao.github.io/blog/2020/eisel-lemire.html
+					u32 skip        = 0;
 					f64 float_value = 0;
-					{
-						if (digits_hi == 0 && digits_lo < (1ULL << 53) && exponent >= -22 && exponent <= 22)
-						{
-							static f64 small_powers_of_10[23] = {
-								1.0e00, 1.0e01, 1.0e02, 1.0e03, 1.0e04, 1.0e05, 1.0e06, 1.0e07, 1.0e08,
-								1.0e09, 1.0e10, 1.0e11, 1.0e12, 1.0e13, 1.0e14, 1.0e15, 1.0e16, 1.0e17,
-								1.0e18, 1.0e19, 1.0e20, 1.0e21, 1.0e22,
-							};
+					Parse_Float_Error error = ParseFloat(cursor, &skip, &float_value);
 
-							if (exponent < 0) float_value = (f64)digits_lo/small_powers_of_10[-exponent];
-							else              float_value = (f64)digits_lo*small_powers_of_10[exponent];
+					if (error == ParseFloatError_Success)
+					{
+						token->kind = Token_Float;
+						
+						Token_Data* token_data = VA_Push(token_array);
+						*token_data = (Token_Data){
+							.floating = float_value,
+						};
+
+						cursor += skip;
+					}
+					else
+					{	
+						if (error == ParseFloatError_MissingTrailingDigits)
+						{
+							//// ERROR: Got decimal point but no digits followed
+						}
+						else if (error == ParseFloatError_MissingDigitsAfterExponent)
+						{
+							//// ERROR: Got floating point exponent marker, but no digits followed
+						}
+						else if (error == ParseFloatError_TooManyDigitsInMantissa)
+						{
+							//// ERROR: Too many digits in floating point literal
+						}
+						else if (error == ParseFloatError_TooManyDigitsInExponent)
+						{
+							//// ERROR: Too many digits in floating point literal exponent
 						}
 						else
 						{
 							//// ERROR: Failed to parse float
-							__debugbreak();
-							return false;
 						}
-					}
 
-					token->kind = Token_Float;
-					
-					Token_Data* token_data = VA_Push(token_array);
-					*token_data = (Token_Data){
-						.floating = float_value,
-					};
+						__debugbreak();
+						return false;
+					}
 				}
 			}
 			else if (*cursor == '"' || *cursor == '\'')
