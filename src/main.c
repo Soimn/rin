@@ -30,12 +30,17 @@
 #include <immintrin.h>
 #include <stdint.h>
 
+// NOTE: forward decl instead of including stdlib.h to avoid unnecessary c stdlib usage
+double strtod(const char* str, char** endptr);
+
 #include "common.h"
 #include "float_parsing.h"
 #include "memory.h"
 #include "virtual_array.h"
 #include "tokens.h"
 #include "lexer.h"
+#include "ast.h"
+#include "parser.h"
 
 // -------------------------------------------------------------------------------------------------------------------------------------
 

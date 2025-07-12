@@ -185,7 +185,7 @@ wmain(int argc, wchar_t** argv)
 		Virtual_Array string_array = VA_Create(sizeof(u8), 1ULL << 30, 256);
 #endif
 
-		LexFile(input, &token_array, &string_array, &tokens, &token_count);
+		RefLexFile(input, &token_array, &string_array, &tokens, &token_count);
 
 		LARGE_INTEGER end_t;
 		QueryPerformanceCounter(&end_t);

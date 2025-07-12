@@ -5,7 +5,7 @@
 #define TOKEN_KIND__IS_BINARY(K) ((umm)((K) - Token__FirstBinary) < (umm)(Token__PastLastBinary - Token__FirstBinary))
 #define TOKEN_KIND__IS_ASS(K) ((umm)((K) - Token__FirstBinaryAssignment) < (umm)(Token__PastLastBinaryAssignment - Token__FirstBinaryAssignment))
 
-#define KEYWORD_LIST                             \
+#define KEYWORD_LIST                                       \
 	FIRST_KEYWORD(     Token_Asm,      'a', 's', "asm")      \
 	REMAINING_KEYWORDS(Token_Break,    'b', 'r', "break")    \
 	REMAINING_KEYWORDS(Token_Case,     'c', 'a', "case")     \
