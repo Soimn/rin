@@ -397,7 +397,7 @@ Clean(u8* contents)
 			while (contents[read_cursor] != 0 && contents[read_cursor] != '\n') Clean__Reject(&read_cursor);
 			if (contents[read_cursor] != 0) Clean__Reject(&read_cursor);
 		}
-		else if (contents[read_cursor] >= 0x7F || contents[read_cursor] == '`' || contents[read_cursor] == '\\')
+		else if (contents[read_cursor] == 0 || contents[read_cursor] >= 0x7F || contents[read_cursor] == '`' || contents[read_cursor] == '\\')
 		{
 			Clean__Reject(&read_cursor);
 		}
@@ -479,6 +479,11 @@ Crawl(Stats* stats, Path_Builder in_path, u8** file_buffer_cursor, u64* file_buf
 							*file_buffer_cursor += write_size;
 							*file_buffer_space  -= write_size;
 
+							(*file_buffer_cursor)[0] = '\r';
+							(*file_buffer_cursor)[1] = '\n';
+							*file_buffer_cursor += 2;
+							*file_buffer_space  -= 2;
+
 							CodeStats_Combine(&stats->pre_clean, pre_clean);
 							CodeStats_Combine(&stats->post_clean, post_clean);
 						}
@@ -549,11 +554,6 @@ wmain(int argc, wchar_t** argv)
 	file_buffer_space  -= sizeof(Stats);
 
 	Crawl(stats, in_path, &file_buffer_cursor, &file_buffer_space);
-
-	u64 zpad = 65;
-	ASSERT(file_buffer_space >= zpad);
-	file_buffer_cursor += zpad;
-	file_buffer_space  -= zpad;
 
 	HANDLE out_file = CreateFileW(out_path, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
 	if (out_file == INVALID_HANDLE_VALUE)

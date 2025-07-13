@@ -4,17 +4,73 @@
 __forceinline static u8*
 SkipNonWhitespace(u8* cursor)
 {
+#if 0
+	__m128i slash        = _mm_set1_epi8('/');
+	__m128i star         = _mm_set1_epi8('*');
+	__m128i newline      = _mm_set1_epi8('\n');
+
+	if (cursor[0] == '/' && cursor[1] == '*')
+	{
+		cursor += 2;
+
+		for (;;)
+		{
+			__m128i c = _mm_loadu_si128((__m128i*)cursor);
+			if (_mm_testz_si128(c, c)) break;
+
+			u32 slash_mask = _mm_movemask_epi8(_mm_cmpeq_epi8(c, slash));
+			u32 star_mask  = _mm_movemask_epi8(_mm_cmpeq_epi8(c, star));
+
+			u32 mask = (star_mask << 1) & slash_mask;
+
+			unsigned long skip;
+			_BitScanForward(&skip, mask);
+
+			if (mask == 0)
+			{
+				cursor += 31; // NOTE: 31 in case of a * at the end of the register
+				continue;
+			}
+			else
+			{
+				cursor += skip + 1;
+				break;
+			}
+		}
+	}
+	else if (cursor[0] == '/' && cursor[1] == '/')
+	{
+		for (;;)
+		{
+			__m128i c = _mm_loadu_si128((__m128i*)cursor);
+			if (_mm_testz_si128(c, c)) break;
+
+			unsigned long skip;
+			if (_BitScanForward(&skip, _mm_movemask_epi8(_mm_cmpeq_epi8(c, newline))))
+			{
+				cursor += skip;
+				break;
+			}
+			else
+			{
+				cursor += 32;
+				continue;
+			}
+		}
+	}
+#else
 	if (cursor[0] == '/' && cursor[1] == '/')
 	{
 		while (*cursor != 0 && *cursor != '\n') ++cursor;
-		++cursor; // NOTE: Skipping 1 zero is fine since there are at least 65 padded at the end
+		++cursor;
 	}
 	else if (cursor[0] == '/' && cursor[1] == '*')
 	{
 		cursor += 2;
 		while (*cursor != 0 && !(cursor[0] == '*' && cursor[1] == '/')) ++cursor;
-		cursor += 2; // NOTE: Skipping 2 zeros is fine since the file is padded
+		cursor += 2;
 	}
+#endif
 	else if (*cursor == '"' || *cursor == '\'')
 	{
 		u8 terminator = *cursor;
@@ -176,7 +232,6 @@ SimpleSIMDSkip(u8* in)
 	u8* cursor = in;
 
 	__m128i hex_21 = _mm_set1_epi8(0x21);
-	__m128i zero   = _mm_setzero_si128();
 
 	for (;;)
 	{
@@ -211,16 +266,15 @@ SimpleAVXSkip(u8* in)
 	u8* cursor = in;
 
 	__m256i hex_21 = _mm256_set1_epi8(0x21);
-	__m256i zero   = _mm256_setzero_si256();
 
 	for (;;)
 	{
 		__m256i c = _mm256_loadu_si256((__m256i*)cursor);
 		if (_mm256_testz_si256(c, c)) break;
 
-		u32 mask = _mm256_movemask_epi8(_mm256_cmpgt_epi8(hex_21, c));
+		s32 mask = _mm256_movemask_epi8(_mm256_cmpgt_epi8(hex_21, c));
 
-		if (mask == 0xFFFFFFFF)
+		if (mask == -1)
 		{
 			cursor += 32;
 			continue;
@@ -238,6 +292,40 @@ SimpleAVXSkip(u8* in)
 	return result;
 }
 
+umm
+SimpleMMXSkip(u8* in)
+{
+	umm result = 0;
+
+	u8* cursor = in;
+
+	__m64 hex_21 = _mm_set1_pi8(0x21);
+
+	for (;;)
+	{
+		__m64 c = _m_from_int64(*(u64*)cursor);
+		if (*(u64*)cursor == 0) break;
+
+		u64 mask = _m_to_int64(_mm_cmpgt_pi8(hex_21, c));
+
+		if (mask == 0xFFFFFFFFFFFFFFFF)
+		{
+			cursor += 8;
+			continue;
+		}
+
+		unsigned long skip;
+		_BitScanForward64(&skip, mask+1);
+		cursor += skip >> 3;
+
+		if (*cursor == 0) break;
+		cursor = SkipNonWhitespace(cursor);
+		++result;
+	}
+
+	return result;
+}
+
 typedef struct Test_Case
 {
 	umm (*func)(u8* in);
@@ -245,14 +333,15 @@ typedef struct Test_Case
 } Test_Case;
 
 Test_Case TestCases[] = {
-	{ .func = SimpleSkip,     .name = "SimpleSkip"     },
-	{ .func = SimpleSkipBR1,  .name = "SimpleSkipBR1"  },
-	{ .func = SimpleSkipBR2,  .name = "SimpleSkipBR2"  },
-	{ .func = SimpleSkipBR3,  .name = "SimpleSkipBR3"  },
-	{ .func = SimpleSkipBR4,  .name = "SimpleSkipBR4"  },
-	{ .func = SimpleSkipBR5,  .name = "SimpleSkipBR5"  },
-	{ .func = SimpleSIMDSkip, .name = "SimpleSIMDSkip" },
-	{ .func = SimpleAVXSkip,  .name = "SimpleAVXSkip"  },
+	{ .func = SimpleSkip,      .name = "SimpleSkip"      },
+	{ .func = SimpleSkipBR1,   .name = "SimpleSkipBR1"   },
+	{ .func = SimpleSkipBR2,   .name = "SimpleSkipBR2"   },
+	{ .func = SimpleSkipBR3,   .name = "SimpleSkipBR3"   },
+	{ .func = SimpleSkipBR4,   .name = "SimpleSkipBR4"   },
+	{ .func = SimpleSkipBR5,   .name = "SimpleSkipBR5"   },
+	{ .func = SimpleSIMDSkip,  .name = "SimpleSIMDSkip"  },
+	{ .func = SimpleAVXSkip,   .name = "SimpleAVXSkip"   },
+	{ .func = SimpleMMXSkip,   .name = "SimpleMMXSkip"   },
 };
 
 int
@@ -314,7 +403,7 @@ wmain(int argc, wchar_t** argv)
 
 		u64 min_t = ~(u64)0;
 
-		for (umm tries = 0; tries < 20; ++tries)
+		for (umm tries = 0; tries < 10; ++tries)
 		{
 			LARGE_INTEGER start_t;
 			QueryPerformanceCounter(&start_t);

@@ -36,7 +36,7 @@ VerifyLexer(String input)
 		String token_string     = TokenKind__ToString(token.kind);
 		String ref_token_string = TokenKind__ToString(ref_token.kind);
 		
-		if (token.kind != ref_token.kind || token.len != ref_token.len || token.offset != ref_token.offset)
+		if (token.kind != ref_token.kind || token.len != ref_token.len || (token.kind != Token_EOF && token.offset != ref_token.offset))
 		{
 			fprintf(stderr, "TOKEN MISMATCH\n");
 			fprintf(stderr, "got:      kind = %18.*s, len = %5u, offset = %10u\n", (int)token_string.len, (char*)token_string.data, token.len, token.offset);
@@ -168,7 +168,7 @@ wmain(int argc, wchar_t** argv)
 		Token* tokens   = 0;
 		u32 token_count = 0;
 
-#if 1
+#if 0
 		Virtual_Array token_array  = VA_Create(sizeof(Token), 3ULL << 30, 1024);
 		Virtual_Array string_array = VA_Create(sizeof(u8), 1ULL << 30, 256);
 
@@ -185,7 +185,7 @@ wmain(int argc, wchar_t** argv)
 		Virtual_Array string_array = VA_Create(sizeof(u8), 1ULL << 30, 256);
 #endif
 
-		RefLexFile(input, &token_array, &string_array, &tokens, &token_count);
+		LexFile(input, &token_array, &string_array, &tokens, &token_count);
 
 		LARGE_INTEGER end_t;
 		QueryPerformanceCounter(&end_t);

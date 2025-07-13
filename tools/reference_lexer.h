@@ -45,7 +45,7 @@ RefLexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array
 				if (*lexer.cursor == 0)
 				{
 					//// ERROR: Unterminated block comment
-					return false;
+					__debugbreak(); return false;
 				}
 				else
 				{
@@ -72,7 +72,7 @@ RefLexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array
 			if (len > ~(u16)0)
 			{
 				//// ERROR: Identifier is too long
-				return false;
+				__debugbreak(); return false;
 			}
 
 			*token = (Token){
@@ -97,7 +97,7 @@ RefLexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array
 			if (!RefLexer__ParseHexLiteral(&lexer, token, offset))
 			{
 				//// ERROR
-				return false;
+				__debugbreak(); return false;
 			}
 		}
 		else if (Char_IsDigit(*lexer.cursor))
@@ -105,7 +105,7 @@ RefLexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array
 			if (!RefLexer__ParseNumber(&lexer, token, offset))
 			{
 				//// ERROR
-				return false;
+				__debugbreak(); return false;
 			}
 		}
 		else if (*lexer.cursor == '"' || *lexer.cursor == '\'')
@@ -113,7 +113,7 @@ RefLexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array
 			if (!RefLexer__ParseString(&lexer, token, offset))
 			{
 				//// ERROR
-				return false;
+				__debugbreak(); return false;
 			}
 		}
 		else if (*lexer.cursor == 0)
@@ -208,7 +208,7 @@ RefLexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array
 				default:
 				{
 					//// ERROR: Unknown symbol
-					return false;
+					__debugbreak(); return false;
 				} break;
 			}
 		}
@@ -239,7 +239,7 @@ RefLexer__ParseString(Ref_Lexer* lexer, Token* token, u32 offset)
 	if (*lexer->cursor == 0)
 	{
 		//// ERROR: Unterminated string literal
-		return false;
+		__debugbreak(); return false;
 	}
 	else
 	{
@@ -262,7 +262,7 @@ RefLexer__ParseString(Ref_Lexer* lexer, Token* token, u32 offset)
 			if (raw[i] > 0x7F)
 			{
 				//// ERROR: Illegal shit in string literal
-				return false;
+				__debugbreak(); return false;
 			}
 			else if (raw[i] != '\\')
 			{
@@ -309,7 +309,7 @@ RefLexer__ParseString(Ref_Lexer* lexer, Token* token, u32 offset)
 							else
 							{
 								//// ERROR: Missing digits in \x
-								return false;
+								__debugbreak(); return false;
 							}
 						}
 
@@ -336,7 +336,7 @@ RefLexer__ParseString(Ref_Lexer* lexer, Token* token, u32 offset)
 							else
 							{
 								//// ERROR: Missing digits in \u
-								return false;
+								__debugbreak(); return false;
 							}
 						}
 
@@ -365,14 +365,14 @@ RefLexer__ParseString(Ref_Lexer* lexer, Token* token, u32 offset)
 						else
 						{
 							//// ERROR: Out of UTF-8 range
-							return false;
+							__debugbreak(); return false;
 						}
 					} break;
 
 					default:
 					{
 						//// ERROR: Illegal escape sequence
-						return false;
+						__debugbreak(); return false;
 					} break;
 				}
 			}
@@ -383,7 +383,7 @@ RefLexer__ParseString(Ref_Lexer* lexer, Token* token, u32 offset)
 			if (string.len != 1)
 			{
 				//// ERROR: Character literal must contain exactly one character
-				return false;
+				__debugbreak(); return false;
 			}
 			else
 			{
@@ -403,7 +403,7 @@ RefLexer__ParseString(Ref_Lexer* lexer, Token* token, u32 offset)
 			if (string.len > ~(u16)0)
 			{
 				//// ERROR: String is too long
-				return false;
+				__debugbreak(); return false;
 			}
 			else
 			{
@@ -481,7 +481,7 @@ RefLexer__ParseHexLiteral(Ref_Lexer* lexer, Token* token, u32 offset)
 		else
 		{
 			//// ERROR: Hex float can only be 8 or 16 digits long
-			return false;
+			__debugbreak(); return false;
 		}
 	}
 	else
@@ -489,7 +489,7 @@ RefLexer__ParseHexLiteral(Ref_Lexer* lexer, Token* token, u32 offset)
 		if (digit_count > 16)
 		{
 			//// ERROR: Hex literal too large
-			return false;
+			__debugbreak(); return false;
 		}
 		else
 		{
@@ -572,7 +572,7 @@ RefLexer__ParseNumber(Ref_Lexer* lexer, Token* token, u32 offset)
 			if (fraction_digit_count == 0)
 			{
 				//// ERROR: Missing digits
-				return false;
+				__debugbreak(); return false;
 			}
 		}
 
@@ -609,7 +609,7 @@ RefLexer__ParseNumber(Ref_Lexer* lexer, Token* token, u32 offset)
 			if (exp_digit_count == 0)
 			{
 				//// ERROR: Missing digits
-				return false;
+				__debugbreak(); return false;
 			}
 		}
 		
