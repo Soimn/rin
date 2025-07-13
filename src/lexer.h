@@ -121,16 +121,23 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 
 	u8* cursor = input.data;
 
-	__m256i hex_df       = _mm256_set1_epi8(0xDF);
-	__m256i alpha_bias   = _mm256_set1_epi8(0x7F - 'Z');
-	__m256i alpha_thresh = _mm256_set1_epi8(0x7E - ('Z' - 'A'));
-	__m256i digit_bias   = _mm256_set1_epi8(0x7F - '9');
-	__m256i digit_thresh = _mm256_set1_epi8(0x7E - ('9' - '0'));
-	__m256i underscore   = _mm256_set1_epi8('_');
-	__m256i slash        = _mm256_set1_epi8('/');
-	__m256i star         = _mm256_set1_epi8('*');
-	__m256i newline      = _mm256_set1_epi8('\n');
-	__m256i indexes      = _mm256_setr_epi8( 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
+	__m256i hex_df           = _mm256_set1_epi8(0xDF);
+	__m256i alpha_bias       = _mm256_set1_epi8(0x7F - 'Z');
+	__m256i alpha_thresh     = _mm256_set1_epi8(0x7E - ('Z' - 'A'));
+	__m256i digit_bias       = _mm256_set1_epi8(0x7F - '9');
+	__m256i digit_thresh     = _mm256_set1_epi8(0x7E - ('9' - '0'));
+	__m128i hex_digit_bias   = _mm_set1_epi8(0x7F - '9');
+	__m128i hex_digit_thresh = _mm_set1_epi8(0x7E - ('9' - '0'));
+	__m128i hex_alpha_bias   = _mm_set1_epi8(0x7F - 'F');
+	__m128i hex_alpha_thresh = _mm_set1_epi8(0x7E - ('F' - 'A'));
+	__m128i hex_30           = _mm_set1_epi8(0x30);
+	__m128i hex_37           = _mm_set1_epi8(0x37);
+	__m128i hex_df_128       = _mm_set1_epi8(0xDF);
+	__m256i underscore       = _mm256_set1_epi8('_');
+	__m256i slash            = _mm256_set1_epi8('/');
+	__m256i star             = _mm256_set1_epi8('*');
+	__m256i newline          = _mm256_set1_epi8('\n');
+	__m256i indexes          = _mm256_setr_epi8( 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
 							                            16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31);
 
 	for (;;)
@@ -302,34 +309,83 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 			{
 				bool is_hex_float = (cursor[1] == 'h');
 
-				u8* start = cursor+2;
+				cursor += 2;
+				u8* start = cursor;
 
-				umm underscore_count = 0;
 				u64 value = 0;
+				umm digit_count = 0;
 
-				++cursor; // NOTE: Skip the 0 in 0x/0h
-				for (;;)
+				__m128i c = _mm_loadu_si128((__m128i*)cursor);
+				__m128i digit_cmp = _mm_cmpgt_epi8(_mm_add_epi8(c, hex_digit_bias), hex_digit_thresh);
+				__m128i alpha_cmp = _mm_cmpgt_epi8(_mm_add_epi8(_mm_and_si128(c, hex_df_128), hex_alpha_bias), hex_alpha_thresh);
+
+				u32 mask = _mm_movemask_epi8(_mm_or_si128(digit_cmp, alpha_cmp));
+
+				unsigned long skip;
+				if (_BitScanForward(&skip, mask+1) && cursor[skip] != '_')
 				{
-					++cursor;
-					if (Char_IsDigit(*cursor))
-					{
-						value <<= 4;
-						value  |= *cursor & 0xF;
-					}
-					else if (Char_IsHexAlpha(*cursor))
-					{
-						value <<= 4;
-						value  |= 9 + (*cursor & 0x1F);
-					}
-					else if (*cursor == '_')
-					{
-						++underscore_count;
-						continue;
-					}
-					else break;
-				}
+					cursor     += skip;
+					digit_count = skip;
 
-				umm digit_count = (cursor - start) - underscore_count;
+					// NOTE: based on https://vgatherps.github.io/2022-11-28-dec/
+
+
+					__m128i digits = _mm_blendv_epi8(_mm_sub_epi8(c, hex_30), _mm_sub_epi8(_mm_and_si128(c, hex_df_128), hex_37), alpha_cmp);
+
+					static __declspec(align(16)) s8 shuffle_patterns[17][16] = {
+						[ 1] = { 0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
+						[ 2] = { 1,  0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
+						[ 3] = { 2,  1,  0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
+						[ 4] = { 3,  2,  1,  0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
+						[ 5] = { 4,  3,  2,  1,  0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
+						[ 6] = { 5,  4,  3,  2,  1,  0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
+						[ 7] = { 6,  5,  4,  3,  2,  1,  0, -1, -1, -1, -1, -1, -1, -1, -1, -1},
+						[ 8] = { 7,  6,  5,  4,  3,  2,  1,  0, -1, -1, -1, -1, -1, -1, -1, -1},
+						[ 9] = { 8,  7,  6,  5,  4,  3,  2,  1,  0, -1, -1, -1, -1, -1, -1, -1},
+						[10] = { 9,  8,  7,  6,  5,  4,  3,  2,  1,  0, -1, -1, -1, -1, -1, -1},
+						[11] = {10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0, -1, -1, -1, -1, -1},
+						[12] = {11, 10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0, -1, -1, -1, -1},
+						[13] = {12, 11, 10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0, -1, -1, -1},
+						[14] = {13, 12, 11, 10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0, -1, -1},
+						[15] = {14, 13, 12, 11, 10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0, -1},
+						[16] = {15, 14, 13, 12, 11, 10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0},
+					};
+
+					digits = _mm_shuffle_epi8(digits, _mm_load_si128((__m128i*)shuffle_patterns[skip]));
+
+					__m128i a = _mm_maddubs_epi16(digits, _mm_setr_epi8(0x1, 0x10, 0x1, 0x10, 0x1, 0x10, 0x1, 0x10, 0x1, 0x10, 0x1, 0x10, 0x1, 0x10, 0x1, 0x10));
+					__m128i b = _mm_shuffle_epi8(a, _mm_setr_epi8(0, 2, 4, 6, 8, 10, 12, 14, -1, -1, -1, -1, -1, -1, -1, -1));
+
+					value = _mm_cvtsi128_si64(b);
+				}
+				else
+				{
+					// NOTE: "Let's punish people for using the feature that makes hex literals more readable, YAY!"
+
+					umm underscore_count = 0;
+
+					for (;; ++cursor)
+					{
+						if (Char_IsDigit(*cursor))
+						{
+							value <<= 4;
+							value  |= *cursor & 0xF;
+						}
+						else if (Char_IsHexAlpha(*cursor))
+						{
+							value <<= 4;
+							value  |= *cursor - ('A' - 10);
+						}
+						else if (*cursor == '_')
+						{
+							++underscore_count;
+							continue;
+						}
+						else break;
+					}
+
+					digit_count = (cursor - start) - underscore_count;
+				}
 
 				if (is_hex_float)
 				{

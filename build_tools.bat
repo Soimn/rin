@@ -28,7 +28,7 @@ if "%1"=="debug" (
 if "%2" neq "" goto invalid_arguments
 
 cl %compile_options% ..\tools\create_lexer_test.c /link %link_options% /pdb:create_lexer_test.pdb /out:create_lexer_test.exe
-cl %compile_options% ..\tools\run_lexer_test.c /link %link_options% /pdb:run_lexer_test.pdb /out:run_lexer_test.exe
+clang-cl %compile_options% ..\tools\run_lexer_test.c /link %link_options% /pdb:run_lexer_test.pdb /out:run_lexer_test.exe
 cl %compile_options% ..\tools\float_parser_test.c /link %link_options% /pdb:float_parser_test.pdb /out:float_parser_test.exe
 clang-cl %compile_options% ..\tools\whitespace_skip_test.c /link %link_options% /pdb:whitespace_skip_test.pdb /out:whitespace_skip_test.exe
 
