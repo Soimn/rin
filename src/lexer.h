@@ -140,6 +140,25 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 	__m256i indexes          = _mm256_setr_epi8( 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
 							                            16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31);
 
+	static __declspec(align(16)) s8 shuffle_patterns[17][16] = {
+		[ 1] = { 0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
+		[ 2] = { 1,  0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
+		[ 3] = { 2,  1,  0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
+		[ 4] = { 3,  2,  1,  0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
+		[ 5] = { 4,  3,  2,  1,  0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
+		[ 6] = { 5,  4,  3,  2,  1,  0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
+		[ 7] = { 6,  5,  4,  3,  2,  1,  0, -1, -1, -1, -1, -1, -1, -1, -1, -1},
+		[ 8] = { 7,  6,  5,  4,  3,  2,  1,  0, -1, -1, -1, -1, -1, -1, -1, -1},
+		[ 9] = { 8,  7,  6,  5,  4,  3,  2,  1,  0, -1, -1, -1, -1, -1, -1, -1},
+		[10] = { 9,  8,  7,  6,  5,  4,  3,  2,  1,  0, -1, -1, -1, -1, -1, -1},
+		[11] = {10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0, -1, -1, -1, -1, -1},
+		[12] = {11, 10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0, -1, -1, -1, -1},
+		[13] = {12, 11, 10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0, -1, -1, -1},
+		[14] = {13, 12, 11, 10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0, -1, -1},
+		[15] = {14, 13, 12, 11, 10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0, -1},
+		[16] = {15, 14, 13, 12, 11, 10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0},
+	};
+
 	for (;;)
 	{
 		for (;;)
@@ -319,37 +338,17 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 				__m128i digit_cmp = _mm_cmpgt_epi8(_mm_add_epi8(c, hex_digit_bias), hex_digit_thresh);
 				__m128i alpha_cmp = _mm_cmpgt_epi8(_mm_add_epi8(_mm_and_si128(c, hex_df_128), hex_alpha_bias), hex_alpha_thresh);
 
-				u32 mask = _mm_movemask_epi8(_mm_or_si128(digit_cmp, alpha_cmp));
+				s16 mask = (s16)_mm_movemask_epi8(_mm_or_si128(digit_cmp, alpha_cmp));
 
 				unsigned long skip;
-				if (_BitScanForward(&skip, mask+1) && cursor[skip] != '_')
+				if (mask != -1 && _BitScanForward(&skip, mask+1) && cursor[skip] != '_')
 				{
 					cursor     += skip;
 					digit_count = skip;
 
 					// NOTE: based on https://vgatherps.github.io/2022-11-28-dec/
 
-
 					__m128i digits = _mm_blendv_epi8(_mm_sub_epi8(c, hex_30), _mm_sub_epi8(_mm_and_si128(c, hex_df_128), hex_37), alpha_cmp);
-
-					static __declspec(align(16)) s8 shuffle_patterns[17][16] = {
-						[ 1] = { 0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
-						[ 2] = { 1,  0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
-						[ 3] = { 2,  1,  0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
-						[ 4] = { 3,  2,  1,  0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
-						[ 5] = { 4,  3,  2,  1,  0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
-						[ 6] = { 5,  4,  3,  2,  1,  0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
-						[ 7] = { 6,  5,  4,  3,  2,  1,  0, -1, -1, -1, -1, -1, -1, -1, -1, -1},
-						[ 8] = { 7,  6,  5,  4,  3,  2,  1,  0, -1, -1, -1, -1, -1, -1, -1, -1},
-						[ 9] = { 8,  7,  6,  5,  4,  3,  2,  1,  0, -1, -1, -1, -1, -1, -1, -1},
-						[10] = { 9,  8,  7,  6,  5,  4,  3,  2,  1,  0, -1, -1, -1, -1, -1, -1},
-						[11] = {10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0, -1, -1, -1, -1, -1},
-						[12] = {11, 10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0, -1, -1, -1, -1},
-						[13] = {12, 11, 10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0, -1, -1, -1},
-						[14] = {13, 12, 11, 10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0, -1, -1},
-						[15] = {14, 13, 12, 11, 10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0, -1},
-						[16] = {15, 14, 13, 12, 11, 10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0},
-					};
 
 					digits = _mm_shuffle_epi8(digits, _mm_load_si128((__m128i*)shuffle_patterns[skip]));
 
@@ -374,7 +373,7 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 						else if (Char_IsHexAlpha(*cursor))
 						{
 							value <<= 4;
-							value  |= *cursor - ('A' - 10);
+							value  |= 9 + (*cursor&0x1F);
 						}
 						else if (*cursor == '_')
 						{
@@ -467,19 +466,51 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 
 				u8* start = cursor;
 
-				for (;;)
+				// NOTE: based on https://vgatherps.github.io/2022-11-28-dec/
+				__m128i c = _mm_loadu_si128((__m128i*)cursor);
+
+				__m128i digit_cmp = _mm_cmpgt_epi8(_mm_add_epi8(c, hex_digit_bias), hex_digit_thresh);
+
+				s16 digit_mask = (s16)_mm_movemask_epi8(digit_cmp);
+
+				unsigned long digit_skip;
+				if (digit_mask != -1 && _BitScanForward(&digit_skip, digit_mask+1) && cursor[digit_skip] != '_')
 				{
-					if (Char_IsDigit(*cursor))
+					cursor     += digit_skip;
+					digit_count = digit_skip;
+
+					__m128i digits = _mm_sub_epi8(c, hex_30);
+					digits = _mm_shuffle_epi8(digits, _mm_loadu_si128((__m128i*)shuffle_patterns[digit_skip]));
+
+					__m128i mul8  = _mm_setr_epi8(1, 10, 1, 10, 1, 10, 1, 10, 1, 10, 1, 10, 1, 10, 1, 10);
+					__m128i mul16 = _mm_setr_epi16(1, 100, 1, 100, 1, 100, 1, 100);
+					__m128i mul32 = _mm_setr_epi16(1, 10000, 1, 10000, 1, 10000, 1, 10000);
+
+					__m128i rAABB = _mm_maddubs_epi16(digits, mul8);
+					__m128i rAAAA_BBBB = _mm_madd_epi16(rAABB, mul16);
+					__m128i rAAAABBBB = _mm_packs_epi32(rAAAA_BBBB, rAAAA_BBBB);
+					__m128i rAAAAAAAA = _mm_madd_epi16(rAAAABBBB, mul32);
+
+					u64 r = _mm_cvtsi128_si64(rAAAAAAAA);
+
+					value = (r >> 32)*100000000 + (r&0xFFFFFFFF);
+				}
+				else
+				{
+					for (;;)
 					{
-						value = value*10 + (*cursor&0xF);
-						++digit_count;
-						++cursor;
+						if (Char_IsDigit(*cursor))
+						{
+							value = value*10 + (*cursor&0xF);
+							++digit_count;
+							++cursor;
+						}
+						else if (*cursor == '_')
+						{
+							++cursor;
+						}
+						else break;
 					}
-					else if (*cursor == '_')
-					{
-						++cursor;
-					}
-					else break;
 				}
 
 				if ((*cursor&0xDF) == 'E')
