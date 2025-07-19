@@ -138,7 +138,7 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 	__m256i star             = _mm256_set1_epi8('*');
 	__m256i newline          = _mm256_set1_epi8('\n');
 	__m256i indexes          = _mm256_setr_epi8( 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
-							                            16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31);
+                                              16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31);
 
 	static __declspec(align(16)) s8 shuffle_patterns[17][16] = {
 		[ 1] = { 0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},

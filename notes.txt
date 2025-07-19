@@ -1,0 +1,76 @@
+if (cast(u8) (*cursor-1) < 0x20)
+{
+}
+
+if (cast(u8, *cursor-1) < 0x20)
+{
+}
+
+if (u8.(*cursor-1) < 0x20)
+{
+}
+
+if ((u8).(*cursor-1) < 0x20)
+{
+}
+
+b := (u64).((s64).((s8).(a)));
+b := u64.s64.s8.a;
+b := (u64).(s64).(s8).(a);
+b := cast(u64) cast(s64) cast(s8) (a);
+b := cast(u64, cast(s64, cast(s8, a)));
+
+b := u64(s64(s8(a)));
+b := u64.(s64.(s8.(a)));
+b := (u64)(s64)(s8)a;
+
+^int.[]
+
+Struct :: struct
+{
+}
+
+(Struct)()
+
+(^u8)()
+
+[]int.{}
+[]int.()
+
+[](typeid.[int, float][1]).{}
+
+^Virtual_Array(int).()
+
+int.[]
+[?]int.{1, 2, 3, 4}
+
+for i in .[0, 1, 2, 3]
+{
+}
+
+if (kind in .[.Ident, .String, .Int, .Float])
+{
+}
+
+printf("some %s with %d %", .["hello", 2, "hello"]);
+
+w: ^typeid;
+
+a := ^w^ ;
+
+V2{ x = 0, y = 2 }
+{0, 2}
+
+V2.{ x = 0, y = 2 }
+.{0, 2}
+
+{ 0 = 0, 1..50 = 2, 50..128 = 3 }
+
+. . <
+
+[]int.{}
+[3]int.{}
+^int.{}
+&.{}
+
+[?]int.{0, 1, 2, 3, 4, 5}[:]
