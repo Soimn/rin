@@ -130,93 +130,6 @@ struct { String token_name; String keyword; } TokenKind_KeywordStrings[] = {
 #undef REMAINING_KEYWORDS
 };
 
-static_assert(Token__PastLastKeyword < 0xFF, "overflow");
-
-static_assert(Token__PastLastMulLevel <= Token__FirstAddLevel, "token block overlap");
-static_assert(Token__PastLastAddLevel <= Token__FirstCmpLevel, "token block overlap");
-static_assert(Token__PastLastCmpLevel <= Token__FirstAndLevel, "token block overlap");
-static_assert(Token__PastLastAndLevel <= Token__FirstOrLevel,  "token block overlap");
-
-static_assert(!TOKEN_KIND__IS_BINARY(Token_EOF)          && !TOKEN_KIND__IS_ASS(Token_EOF),          "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_Error)        && !TOKEN_KIND__IS_ASS(Token_Error),        "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_Ident)        && !TOKEN_KIND__IS_ASS(Token_Ident),        "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_String)       && !TOKEN_KIND__IS_ASS(Token_String),       "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_Char)         && !TOKEN_KIND__IS_ASS(Token_Char),         "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_Int)          && !TOKEN_KIND__IS_ASS(Token_Int),          "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_Int128)       && !TOKEN_KIND__IS_ASS(Token_Int128),       "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_Float)        && !TOKEN_KIND__IS_ASS(Token_Float),        "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_Pound)        && !TOKEN_KIND__IS_ASS(Token_Pound),        "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_Cash)         && !TOKEN_KIND__IS_ASS(Token_Cash),         "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_OpenParen)    && !TOKEN_KIND__IS_ASS(Token_OpenParen),    "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_CloseParen)   && !TOKEN_KIND__IS_ASS(Token_CloseParen),   "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_Comma)        && !TOKEN_KIND__IS_ASS(Token_Comma),        "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_Dot)          && !TOKEN_KIND__IS_ASS(Token_Dot),          "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_Colon)        && !TOKEN_KIND__IS_ASS(Token_Colon),        "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_Semicolon)    && !TOKEN_KIND__IS_ASS(Token_Semicolon),    "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_QMark)        && !TOKEN_KIND__IS_ASS(Token_QMark),        "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_At)           && !TOKEN_KIND__IS_ASS(Token_At),           "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_OpenBracket)  && !TOKEN_KIND__IS_ASS(Token_OpenBracket),  "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_CloseBracket) && !TOKEN_KIND__IS_ASS(Token_CloseBracket), "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_Hat)          && !TOKEN_KIND__IS_ASS(Token_Hat),          "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_OpenBrace)    && !TOKEN_KIND__IS_ASS(Token_OpenBrace),    "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_CloseBrace)   && !TOKEN_KIND__IS_ASS(Token_CloseBrace),   "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_Bang)         && !TOKEN_KIND__IS_ASS(Token_Bang),         "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_MinusMinus)   && !TOKEN_KIND__IS_ASS(Token_MinusMinus),   "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_PlusPlus)     && !TOKEN_KIND__IS_ASS(Token_PlusPlus),     "TOKEN_KIND_IS_* macros are broken");
-
-static_assert( TOKEN_KIND__IS_BINARY(Token_Star)    && !TOKEN_KIND__IS_ASS(Token_Star),    "TOKEN_KIND_IS_* macros are broken");
-static_assert( TOKEN_KIND__IS_BINARY(Token_Slash)   && !TOKEN_KIND__IS_ASS(Token_Slash),   "TOKEN_KIND_IS_* macros are broken");
-static_assert( TOKEN_KIND__IS_BINARY(Token_Percent) && !TOKEN_KIND__IS_ASS(Token_Percent), "TOKEN_KIND_IS_* macros are broken");
-static_assert( TOKEN_KIND__IS_BINARY(Token_And)     && !TOKEN_KIND__IS_ASS(Token_And),     "TOKEN_KIND_IS_* macros are broken");
-static_assert( TOKEN_KIND__IS_BINARY(Token_LtLt)    && !TOKEN_KIND__IS_ASS(Token_LtLt),    "TOKEN_KIND_IS_* macros are broken");
-static_assert( TOKEN_KIND__IS_BINARY(Token_GtGt)    && !TOKEN_KIND__IS_ASS(Token_GtGt),    "TOKEN_KIND_IS_* macros are broken");
-static_assert( TOKEN_KIND__IS_BINARY(Token_Plus)    && !TOKEN_KIND__IS_ASS(Token_Plus),    "TOKEN_KIND_IS_* macros are broken");
-static_assert( TOKEN_KIND__IS_BINARY(Token_Minus)   && !TOKEN_KIND__IS_ASS(Token_Minus),   "TOKEN_KIND_IS_* macros are broken");
-static_assert( TOKEN_KIND__IS_BINARY(Token_Or)      && !TOKEN_KIND__IS_ASS(Token_Or),      "TOKEN_KIND_IS_* macros are broken");
-static_assert( TOKEN_KIND__IS_BINARY(Token_Tilde)   && !TOKEN_KIND__IS_ASS(Token_Tilde),   "TOKEN_KIND_IS_* macros are broken");
-static_assert( TOKEN_KIND__IS_BINARY(Token_EqEq)    && !TOKEN_KIND__IS_ASS(Token_EqEq),    "TOKEN_KIND_IS_* macros are broken");
-static_assert( TOKEN_KIND__IS_BINARY(Token_BangEq)  && !TOKEN_KIND__IS_ASS(Token_BangEq),  "TOKEN_KIND_IS_* macros are broken");
-static_assert( TOKEN_KIND__IS_BINARY(Token_Lt)      && !TOKEN_KIND__IS_ASS(Token_Lt),      "TOKEN_KIND_IS_* macros are broken");
-static_assert( TOKEN_KIND__IS_BINARY(Token_LtEq)    && !TOKEN_KIND__IS_ASS(Token_LtEq),    "TOKEN_KIND_IS_* macros are broken");
-static_assert( TOKEN_KIND__IS_BINARY(Token_Gt)      && !TOKEN_KIND__IS_ASS(Token_Gt),      "TOKEN_KIND_IS_* macros are broken");
-static_assert( TOKEN_KIND__IS_BINARY(Token_GtEq)    && !TOKEN_KIND__IS_ASS(Token_GtEq),    "TOKEN_KIND_IS_* macros are broken");
-static_assert( TOKEN_KIND__IS_BINARY(Token_AndAnd)  && !TOKEN_KIND__IS_ASS(Token_AndAnd),  "TOKEN_KIND_IS_* macros are broken");
-static_assert( TOKEN_KIND__IS_BINARY(Token_OrOr)    && !TOKEN_KIND__IS_ASS(Token_OrOr),    "TOKEN_KIND_IS_* macros are broken");
-
-static_assert(!TOKEN_KIND__IS_BINARY(Token_StarEq)    &&  TOKEN_KIND__IS_ASS(Token_StarEq),    "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_SlashEq)   &&  TOKEN_KIND__IS_ASS(Token_SlashEq),   "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_PercentEq) &&  TOKEN_KIND__IS_ASS(Token_PercentEq), "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_AndEq)     &&  TOKEN_KIND__IS_ASS(Token_AndEq),     "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_LtLtEq)    &&  TOKEN_KIND__IS_ASS(Token_LtLtEq),    "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_GtGtEq)    &&  TOKEN_KIND__IS_ASS(Token_GtGtEq),    "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_PlusEq)    &&  TOKEN_KIND__IS_ASS(Token_PlusEq),    "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_MinusEq)   &&  TOKEN_KIND__IS_ASS(Token_MinusEq),   "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_OrEq)      &&  TOKEN_KIND__IS_ASS(Token_OrEq),      "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_TildeEq)   &&  TOKEN_KIND__IS_ASS(Token_TildeEq),   "TOKEN_KIND_IS_* macros are broken");
-static_assert(!TOKEN_KIND__IS_BINARY(Token_Eq)        &&  TOKEN_KIND__IS_ASS(Token_Eq),        "TOKEN_KIND_IS_* macros are broken");
-
-static_assert(TOKEN_KIND__BINARY_TO_ASS(Token_Star)    == Token_StarEq,    "TOKEN_KIND__BINARY_TO_ASS is broken");
-static_assert(TOKEN_KIND__BINARY_TO_ASS(Token_Slash)   == Token_SlashEq,   "TOKEN_KIND__BINARY_TO_ASS is broken");
-static_assert(TOKEN_KIND__BINARY_TO_ASS(Token_Percent) == Token_PercentEq, "TOKEN_KIND__BINARY_TO_ASS is broken");
-static_assert(TOKEN_KIND__BINARY_TO_ASS(Token_And)     == Token_AndEq,     "TOKEN_KIND__BINARY_TO_ASS is broken");
-static_assert(TOKEN_KIND__BINARY_TO_ASS(Token_LtLt)    == Token_LtLtEq,    "TOKEN_KIND__BINARY_TO_ASS is broken");
-static_assert(TOKEN_KIND__BINARY_TO_ASS(Token_GtGt)    == Token_GtGtEq,    "TOKEN_KIND__BINARY_TO_ASS is broken");
-static_assert(TOKEN_KIND__BINARY_TO_ASS(Token_Plus)    == Token_PlusEq,    "TOKEN_KIND__BINARY_TO_ASS is broken");
-static_assert(TOKEN_KIND__BINARY_TO_ASS(Token_Minus)   == Token_MinusEq,   "TOKEN_KIND__BINARY_TO_ASS is broken");
-static_assert(TOKEN_KIND__BINARY_TO_ASS(Token_Or)      == Token_OrEq,      "TOKEN_KIND__BINARY_TO_ASS is broken");
-static_assert(TOKEN_KIND__BINARY_TO_ASS(Token_Tilde)   == Token_TildeEq,   "TOKEN_KIND__BINARY_TO_ASS is broken");
-
-static_assert(TOKEN_KIND__ASS_TO_BINARY(Token_StarEq)    == Token_Star,    "TOKEN_KIND__ASS_TO_BINARY is broken");
-static_assert(TOKEN_KIND__ASS_TO_BINARY(Token_SlashEq)   == Token_Slash,   "TOKEN_KIND__ASS_TO_BINARY is broken");
-static_assert(TOKEN_KIND__ASS_TO_BINARY(Token_PercentEq) == Token_Percent, "TOKEN_KIND__ASS_TO_BINARY is broken");
-static_assert(TOKEN_KIND__ASS_TO_BINARY(Token_AndEq)     == Token_And,     "TOKEN_KIND__ASS_TO_BINARY is broken");
-static_assert(TOKEN_KIND__ASS_TO_BINARY(Token_LtLtEq)    == Token_LtLt,    "TOKEN_KIND__ASS_TO_BINARY is broken");
-static_assert(TOKEN_KIND__ASS_TO_BINARY(Token_GtGtEq)    == Token_GtGt,    "TOKEN_KIND__ASS_TO_BINARY is broken");
-static_assert(TOKEN_KIND__ASS_TO_BINARY(Token_PlusEq)    == Token_Plus,    "TOKEN_KIND__ASS_TO_BINARY is broken");
-static_assert(TOKEN_KIND__ASS_TO_BINARY(Token_MinusEq)   == Token_Minus,   "TOKEN_KIND__ASS_TO_BINARY is broken");
-static_assert(TOKEN_KIND__ASS_TO_BINARY(Token_OrEq)      == Token_Or,      "TOKEN_KIND__ASS_TO_BINARY is broken");
-static_assert(TOKEN_KIND__ASS_TO_BINARY(Token_TildeEq)   == Token_Tilde,   "TOKEN_KIND__ASS_TO_BINARY is broken");
-
 typedef __declspec(align(8)) struct Token
 {
 	u16 kind;
@@ -303,3 +216,90 @@ TokenKind__ToString(Token_Kind kind)
 		} break;
 	}
 }
+
+static_assert(Token__PastLastKeyword < 0xFF, "overflow");
+
+static_assert(Token__PastLastMulLevel <= Token__FirstAddLevel, "token block overlap");
+static_assert(Token__PastLastAddLevel <= Token__FirstCmpLevel, "token block overlap");
+static_assert(Token__PastLastCmpLevel <= Token__FirstAndLevel, "token block overlap");
+static_assert(Token__PastLastAndLevel <= Token__FirstOrLevel,  "token block overlap");
+
+static_assert(!TOKEN_KIND__IS_BINARY(Token_EOF)          && !TOKEN_KIND__IS_ASS(Token_EOF),          "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_Error)        && !TOKEN_KIND__IS_ASS(Token_Error),        "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_Ident)        && !TOKEN_KIND__IS_ASS(Token_Ident),        "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_String)       && !TOKEN_KIND__IS_ASS(Token_String),       "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_Char)         && !TOKEN_KIND__IS_ASS(Token_Char),         "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_Int)          && !TOKEN_KIND__IS_ASS(Token_Int),          "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_Int128)       && !TOKEN_KIND__IS_ASS(Token_Int128),       "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_Float)        && !TOKEN_KIND__IS_ASS(Token_Float),        "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_Pound)        && !TOKEN_KIND__IS_ASS(Token_Pound),        "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_Cash)         && !TOKEN_KIND__IS_ASS(Token_Cash),         "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_OpenParen)    && !TOKEN_KIND__IS_ASS(Token_OpenParen),    "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_CloseParen)   && !TOKEN_KIND__IS_ASS(Token_CloseParen),   "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_Comma)        && !TOKEN_KIND__IS_ASS(Token_Comma),        "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_Dot)          && !TOKEN_KIND__IS_ASS(Token_Dot),          "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_Colon)        && !TOKEN_KIND__IS_ASS(Token_Colon),        "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_Semicolon)    && !TOKEN_KIND__IS_ASS(Token_Semicolon),    "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_QMark)        && !TOKEN_KIND__IS_ASS(Token_QMark),        "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_At)           && !TOKEN_KIND__IS_ASS(Token_At),           "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_OpenBracket)  && !TOKEN_KIND__IS_ASS(Token_OpenBracket),  "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_CloseBracket) && !TOKEN_KIND__IS_ASS(Token_CloseBracket), "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_Hat)          && !TOKEN_KIND__IS_ASS(Token_Hat),          "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_OpenBrace)    && !TOKEN_KIND__IS_ASS(Token_OpenBrace),    "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_CloseBrace)   && !TOKEN_KIND__IS_ASS(Token_CloseBrace),   "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_Bang)         && !TOKEN_KIND__IS_ASS(Token_Bang),         "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_MinusMinus)   && !TOKEN_KIND__IS_ASS(Token_MinusMinus),   "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_PlusPlus)     && !TOKEN_KIND__IS_ASS(Token_PlusPlus),     "TOKEN_KIND_IS_* macros are broken");
+
+static_assert( TOKEN_KIND__IS_BINARY(Token_Star)    && !TOKEN_KIND__IS_ASS(Token_Star),    "TOKEN_KIND_IS_* macros are broken");
+static_assert( TOKEN_KIND__IS_BINARY(Token_Slash)   && !TOKEN_KIND__IS_ASS(Token_Slash),   "TOKEN_KIND_IS_* macros are broken");
+static_assert( TOKEN_KIND__IS_BINARY(Token_Percent) && !TOKEN_KIND__IS_ASS(Token_Percent), "TOKEN_KIND_IS_* macros are broken");
+static_assert( TOKEN_KIND__IS_BINARY(Token_And)     && !TOKEN_KIND__IS_ASS(Token_And),     "TOKEN_KIND_IS_* macros are broken");
+static_assert( TOKEN_KIND__IS_BINARY(Token_LtLt)    && !TOKEN_KIND__IS_ASS(Token_LtLt),    "TOKEN_KIND_IS_* macros are broken");
+static_assert( TOKEN_KIND__IS_BINARY(Token_GtGt)    && !TOKEN_KIND__IS_ASS(Token_GtGt),    "TOKEN_KIND_IS_* macros are broken");
+static_assert( TOKEN_KIND__IS_BINARY(Token_Plus)    && !TOKEN_KIND__IS_ASS(Token_Plus),    "TOKEN_KIND_IS_* macros are broken");
+static_assert( TOKEN_KIND__IS_BINARY(Token_Minus)   && !TOKEN_KIND__IS_ASS(Token_Minus),   "TOKEN_KIND_IS_* macros are broken");
+static_assert( TOKEN_KIND__IS_BINARY(Token_Or)      && !TOKEN_KIND__IS_ASS(Token_Or),      "TOKEN_KIND_IS_* macros are broken");
+static_assert( TOKEN_KIND__IS_BINARY(Token_Tilde)   && !TOKEN_KIND__IS_ASS(Token_Tilde),   "TOKEN_KIND_IS_* macros are broken");
+static_assert( TOKEN_KIND__IS_BINARY(Token_EqEq)    && !TOKEN_KIND__IS_ASS(Token_EqEq),    "TOKEN_KIND_IS_* macros are broken");
+static_assert( TOKEN_KIND__IS_BINARY(Token_BangEq)  && !TOKEN_KIND__IS_ASS(Token_BangEq),  "TOKEN_KIND_IS_* macros are broken");
+static_assert( TOKEN_KIND__IS_BINARY(Token_Lt)      && !TOKEN_KIND__IS_ASS(Token_Lt),      "TOKEN_KIND_IS_* macros are broken");
+static_assert( TOKEN_KIND__IS_BINARY(Token_LtEq)    && !TOKEN_KIND__IS_ASS(Token_LtEq),    "TOKEN_KIND_IS_* macros are broken");
+static_assert( TOKEN_KIND__IS_BINARY(Token_Gt)      && !TOKEN_KIND__IS_ASS(Token_Gt),      "TOKEN_KIND_IS_* macros are broken");
+static_assert( TOKEN_KIND__IS_BINARY(Token_GtEq)    && !TOKEN_KIND__IS_ASS(Token_GtEq),    "TOKEN_KIND_IS_* macros are broken");
+static_assert( TOKEN_KIND__IS_BINARY(Token_AndAnd)  && !TOKEN_KIND__IS_ASS(Token_AndAnd),  "TOKEN_KIND_IS_* macros are broken");
+static_assert( TOKEN_KIND__IS_BINARY(Token_OrOr)    && !TOKEN_KIND__IS_ASS(Token_OrOr),    "TOKEN_KIND_IS_* macros are broken");
+
+static_assert(!TOKEN_KIND__IS_BINARY(Token_StarEq)    &&  TOKEN_KIND__IS_ASS(Token_StarEq),    "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_SlashEq)   &&  TOKEN_KIND__IS_ASS(Token_SlashEq),   "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_PercentEq) &&  TOKEN_KIND__IS_ASS(Token_PercentEq), "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_AndEq)     &&  TOKEN_KIND__IS_ASS(Token_AndEq),     "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_LtLtEq)    &&  TOKEN_KIND__IS_ASS(Token_LtLtEq),    "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_GtGtEq)    &&  TOKEN_KIND__IS_ASS(Token_GtGtEq),    "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_PlusEq)    &&  TOKEN_KIND__IS_ASS(Token_PlusEq),    "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_MinusEq)   &&  TOKEN_KIND__IS_ASS(Token_MinusEq),   "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_OrEq)      &&  TOKEN_KIND__IS_ASS(Token_OrEq),      "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_TildeEq)   &&  TOKEN_KIND__IS_ASS(Token_TildeEq),   "TOKEN_KIND_IS_* macros are broken");
+static_assert(!TOKEN_KIND__IS_BINARY(Token_Eq)        &&  TOKEN_KIND__IS_ASS(Token_Eq),        "TOKEN_KIND_IS_* macros are broken");
+
+static_assert(TOKEN_KIND__BINARY_TO_ASS(Token_Star)    == Token_StarEq,    "TOKEN_KIND__BINARY_TO_ASS is broken");
+static_assert(TOKEN_KIND__BINARY_TO_ASS(Token_Slash)   == Token_SlashEq,   "TOKEN_KIND__BINARY_TO_ASS is broken");
+static_assert(TOKEN_KIND__BINARY_TO_ASS(Token_Percent) == Token_PercentEq, "TOKEN_KIND__BINARY_TO_ASS is broken");
+static_assert(TOKEN_KIND__BINARY_TO_ASS(Token_And)     == Token_AndEq,     "TOKEN_KIND__BINARY_TO_ASS is broken");
+static_assert(TOKEN_KIND__BINARY_TO_ASS(Token_LtLt)    == Token_LtLtEq,    "TOKEN_KIND__BINARY_TO_ASS is broken");
+static_assert(TOKEN_KIND__BINARY_TO_ASS(Token_GtGt)    == Token_GtGtEq,    "TOKEN_KIND__BINARY_TO_ASS is broken");
+static_assert(TOKEN_KIND__BINARY_TO_ASS(Token_Plus)    == Token_PlusEq,    "TOKEN_KIND__BINARY_TO_ASS is broken");
+static_assert(TOKEN_KIND__BINARY_TO_ASS(Token_Minus)   == Token_MinusEq,   "TOKEN_KIND__BINARY_TO_ASS is broken");
+static_assert(TOKEN_KIND__BINARY_TO_ASS(Token_Or)      == Token_OrEq,      "TOKEN_KIND__BINARY_TO_ASS is broken");
+static_assert(TOKEN_KIND__BINARY_TO_ASS(Token_Tilde)   == Token_TildeEq,   "TOKEN_KIND__BINARY_TO_ASS is broken");
+
+static_assert(TOKEN_KIND__ASS_TO_BINARY(Token_StarEq)    == Token_Star,    "TOKEN_KIND__ASS_TO_BINARY is broken");
+static_assert(TOKEN_KIND__ASS_TO_BINARY(Token_SlashEq)   == Token_Slash,   "TOKEN_KIND__ASS_TO_BINARY is broken");
+static_assert(TOKEN_KIND__ASS_TO_BINARY(Token_PercentEq) == Token_Percent, "TOKEN_KIND__ASS_TO_BINARY is broken");
+static_assert(TOKEN_KIND__ASS_TO_BINARY(Token_AndEq)     == Token_And,     "TOKEN_KIND__ASS_TO_BINARY is broken");
+static_assert(TOKEN_KIND__ASS_TO_BINARY(Token_LtLtEq)    == Token_LtLt,    "TOKEN_KIND__ASS_TO_BINARY is broken");
+static_assert(TOKEN_KIND__ASS_TO_BINARY(Token_GtGtEq)    == Token_GtGt,    "TOKEN_KIND__ASS_TO_BINARY is broken");
+static_assert(TOKEN_KIND__ASS_TO_BINARY(Token_PlusEq)    == Token_Plus,    "TOKEN_KIND__ASS_TO_BINARY is broken");
+static_assert(TOKEN_KIND__ASS_TO_BINARY(Token_MinusEq)   == Token_Minus,   "TOKEN_KIND__ASS_TO_BINARY is broken");
+static_assert(TOKEN_KIND__ASS_TO_BINARY(Token_OrEq)      == Token_Or,      "TOKEN_KIND__ASS_TO_BINARY is broken");
+static_assert(TOKEN_KIND__ASS_TO_BINARY(Token_TildeEq)   == Token_Tilde,   "TOKEN_KIND__ASS_TO_BINARY is broken");

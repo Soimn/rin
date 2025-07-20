@@ -12,6 +12,7 @@ typedef enum AST_Kind
 	ASTKind_String,
 	ASTKind_Char,
 	ASTKind_Int,
+	ASTKind_Int128,
 	ASTKind_Float,
 	ASTKind_Bool,
 	ASTKind_Compound,
@@ -29,6 +30,7 @@ typedef enum AST_Kind
 
 	ASTKind__FirstPostfixExpr,
 	ASTKind_Deref = ASTKind__FirstPostfixExpr,
+	ASTKind_Call,
 	ASTKind_Index,
 	ASTKind_Slice,
 	ASTKind_Member,
@@ -82,6 +84,8 @@ typedef enum AST_Kind
 
 	ASTKind_Conditional,
 	ASTKind__PastLastExpr,
+
+	ASTKind_Argument,
 } AST_Kind;
 
 #if 1
@@ -115,17 +119,23 @@ typedef __declspec(align(4)) struct AST_Header
 
 // -- Primary expressions
 
+#pragma pack(push, 4)
 typedef struct AST_Ident
 {
 	AST_HEADER;
-	// TODO: How to store idents?
+	u32 len;
+	u8* data;
 } AST_Ident;
+#pragma pack(pop)
 
+#pragma pack(push, 4)
 typedef struct AST_String
 {
 	AST_HEADER;
-	// TODO: How to store strings?
+	u32 len;
+	u8* data;
 } AST_String;
+#pragma pack(pop)
 
 typedef struct AST_Char
 {
@@ -133,17 +143,30 @@ typedef struct AST_Char
 	u8 value;
 } AST_Char;
 
+#pragma pack(push, 4)
 typedef struct AST_Int
 {
 	AST_HEADER;
 	u64 value;
 } AST_Int;
+#pragma pack(pop)
 
+#pragma pack(push, 4)
+typedef struct AST_Int128
+{
+	AST_HEADER;
+	u64 value_lo;
+	u64 value_hi;
+} AST_Int128;
+#pragma pack(pop)
+
+#pragma pack(push, 4)
 typedef struct AST_Float
 {
 	AST_HEADER;
 	f64 value;
 } AST_Float;
+#pragma pack(pop)
 
 typedef struct AST_Bool
 {
@@ -157,53 +180,53 @@ typedef struct AST_Compound
 	AST_Ptr inner_expr;
 } AST_Compound;
 
-typedef struct AST_Proc_Type
+typedef struct AST_ProcType
 {
 	AST_HEADER;
 	// TODO: params
 	// TODO: return values
-} AST_Proc_Type;
+} AST_ProcType;
 
-typedef struct AST_Proc_Lit
+typedef struct AST_ProcLit
 {
 	AST_HEADER;
 	// TODO: params
 	// TODO: return values
 	// TODO: body
-} AST_Proc_Lit;
+} AST_ProcLit;
 
-typedef struct AST_Struct_Type
+typedef struct AST_StructType
 {
 	AST_HEADER;
 	// TODO: members
-} AST_Struct_Type;
+} AST_StructType;
 
-typedef struct AST_Enum_Type
+typedef struct AST_EnumType
 {
 	AST_HEADER;
 	// TODO: members
-} AST_Enum_Type;
+} AST_EnumType;
 
 // -- Type prefix level
 
-typedef struct AST_Pointer_To
+typedef struct AST_PointerTo
 {
 	AST_HEADER;
 	AST_Ptr elem_type;
-} AST_Pointer_To;
+} AST_PointerTo;
 
-typedef struct AST_Slice_Of
+typedef struct AST_SliceOf
 {
 	AST_HEADER;
 	AST_Ptr elem_type;
-} AST_Slice_Of;
+} AST_SliceOf;
 
-typedef struct AST_Array_Of
+typedef struct AST_ArrayOf
 {
 	AST_HEADER;
 	AST_Ptr len;
 	AST_Ptr elem_type;
-} AST_Array_Of;
+} AST_ArrayOf;
 
 // -- Postfix
 
@@ -212,6 +235,13 @@ typedef struct AST_Deref
 	AST_HEADER;
 	AST_Ptr expr;
 } AST_Deref;
+
+typedef struct AST_Call
+{
+	AST_HEADER;
+	AST_Ptr expr;
+	AST_Ptr args;
+} AST_Call;
 
 typedef struct AST_Index
 {
@@ -235,12 +265,12 @@ typedef struct AST_Member
 	AST_Ptr name;
 } AST_Member;
 
-typedef struct AST_Struct_Lit
+typedef struct AST_StructLit
 {
 	AST_HEADER;
 	AST_Ptr type;
-	// TODO: arguments
-} AST_Struct_Lit;
+	AST_Ptr args;
+} AST_StructLit;
 
 // -- Prefix level
 
@@ -267,3 +297,13 @@ typedef struct AST_Conditional
 	AST_Ptr true_val;
 	AST_Ptr false_val;
 } AST_Conditional;
+
+// --
+
+typedef struct AST_Argument
+{
+	AST_HEADER;
+	AST_Ptr next;
+	AST_Ptr name;
+	AST_Ptr value;
+} AST_Argument;

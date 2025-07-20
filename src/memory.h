@@ -10,3 +10,12 @@ IsZero(void* ptr, umm size)
 
 	return result;
 }
+
+static void
+Zero(void* ptr, umm size)
+{
+	for (umm i = 0; i < size; ++i)
+	{
+		((u8*)ptr)[i] = 0;
+	}
+}
