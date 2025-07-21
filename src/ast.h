@@ -86,6 +86,13 @@ typedef enum AST_Kind
 	ASTKind__PastLastExpr,
 
 	ASTKind_Argument,
+	ASTKind_Parameter,
+	ASTKind_ReturnVal,
+
+	ASTKind__FirstStatement,
+	ASTKind_Block = ASTKind__FirstStatement,
+	ASTKind_If,
+	ASTKind__PastLastStatement,
 } AST_Kind;
 
 #if 1
@@ -116,6 +123,14 @@ typedef __declspec(align(4)) struct AST_Header
 } AST_Header;
 
 #define AST_HEADER union { struct AST_Header; AST_Header header; }
+
+typedef __declspec(align(4)) struct AST_Linked_Header
+{
+	AST_HEADER;
+	AST_Ptr next;
+} AST_Linked_Header;
+
+#define AST_LINKED_HEADER struct AST_Linked_Header
 
 // -- Primary expressions
 
@@ -183,28 +198,29 @@ typedef struct AST_Compound
 typedef struct AST_ProcType
 {
 	AST_HEADER;
-	// TODO: params
-	// TODO: return values
+	AST_Ptr params;
+	AST_Ptr return_vals;
 } AST_ProcType;
 
 typedef struct AST_ProcLit
 {
 	AST_HEADER;
-	// TODO: params
-	// TODO: return values
-	// TODO: body
+	AST_Ptr params;
+	AST_Ptr return_vals;
+	AST_Ptr body;
 } AST_ProcLit;
 
 typedef struct AST_StructType
 {
 	AST_HEADER;
-	// TODO: members
+	AST_Ptr body;
 } AST_StructType;
 
 typedef struct AST_EnumType
 {
 	AST_HEADER;
-	// TODO: members
+	AST_Ptr elem_type;
+	AST_Ptr body;
 } AST_EnumType;
 
 // -- Type prefix level
@@ -302,8 +318,39 @@ typedef struct AST_Conditional
 
 typedef struct AST_Argument
 {
-	AST_HEADER;
-	AST_Ptr next;
+	AST_LINKED_HEADER;
 	AST_Ptr name;
 	AST_Ptr value;
 } AST_Argument;
+
+typedef struct AST_Parameter
+{
+	AST_LINKED_HEADER;
+	AST_Ptr name;
+	AST_Ptr type;
+	AST_Ptr value;
+} AST_Parameter;
+
+typedef struct AST_ReturnVal
+{
+	AST_LINKED_HEADER;
+	AST_Ptr name;
+	AST_Ptr type;
+} AST_ReturnVal;
+
+// -- Statements
+typedef struct AST_Block
+{
+	AST_LINKED_HEADER;
+	AST_Ptr label;
+	AST_Ptr statements;
+} AST_Block;
+
+typedef struct AST_If
+{
+	AST_LINKED_HEADER;
+	AST_Ptr label;
+	AST_Ptr condition;
+	AST_Ptr true_branch;
+	AST_Ptr false_branch;
+} AST_If;

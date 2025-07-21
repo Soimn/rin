@@ -10,6 +10,16 @@ Parser__GetToken(Parser* state)
 	return *state->token;
 }
 
+static Token
+Parser__PeekToken(Parser* state)
+{
+	// TODO: Make sure this is legal in all cases.
+	//       Should not be a problem if Token_EOF is present and the
+	//       parser only peeks one token, but I feel like not having
+	//       a guarantee is kind of yucky
+	return *(state->token + 1);
+}
+
 static Token_Data
 Parser__GetTokenData(Parser* state)
 {
@@ -48,6 +58,7 @@ Parser__PushNode(Parser* state, AST_Kind kind, umm size)
 }
 
 #define GET_TOKEN() Parser__GetToken(state)
+#define PEEK_TOKEN() Parser__PeekToken(state)
 #define GET_TOKEN_DATA() Parser__GetTokenData(state)
 #define NEXT_TOKEN() Parser__NextToken(state)
 #define EAT_TOKEN(K) Parser__EatToken(state, (K))
@@ -56,6 +67,8 @@ Parser__PushNode(Parser* state, AST_Kind kind, umm size)
 
 static bool Parser__ParseExpr(Parser* state, AST_Header** expr);
 static bool Parser__ParseTypePrefixExpr(Parser* state, AST_Header** expr);
+static bool Parser__ParseBlock(Parser* state, AST_Header** block);
+static bool Parser__ParseStatement(Parser* state, AST_Header** statement);
 
 static bool
 Parser__ParseArguments(Parser* state, AST_Header** args)
@@ -131,6 +144,319 @@ Parser__ParseDotStuff(Parser* state, AST_Header* lhs, AST_Header** expr)
 
 		*expr = &node->header;
 	}
+
+	return true;
+}
+
+static bool
+Parser__ParseProc(Parser* state, AST_Header** expr)
+{
+	ASSERT(GET_TOKEN().kind == Token_Proc);
+	NEXT_TOKEN();
+
+	if (!EAT_TOKEN(Token_OpenParen))
+	{
+		//// ERROR: Missing parameter list
+		NOT_IMPLEMENTED;
+		return false;
+	}
+
+	if (GET_TOKEN().kind == Token_CloseParen)
+	{
+		//// ERROR: Missing parameters
+		NOT_IMPLEMENTED;
+		return false;
+	}
+
+	AST_Parameter* params = 0;
+	{
+		AST_Header* first = 0;
+		if (!Parser__ParseExpr(state, &first)) return false;
+
+		if (GET_TOKEN().kind == Token_Comma || GET_TOKEN().kind == Token_CloseParen)
+		{
+			// NOTE: This is the type only variant for the parameter list i.e. proc(int, float, string)
+			//       and not the normal proc(name0: type0, name1: type1)
+
+			AST_Parameter* first_node = PUSH_NODE(Parameter);
+			first_node->next  = ASTPtr_Nil;
+			first_node->name  = ASTPtr_Nil;
+			first_node->value = ASTPtr_Nil;
+			ASTPtr_SetToPtr(&first_node->type, first);
+
+			params = first_node;
+			AST_Ptr* param_link = &first_node->next;
+
+			for (;;)
+			{
+				if (GET_TOKEN().kind == Token_Colon)
+				{
+					//// ERROR: Illegal to mix type only and name, type, val proc parameter variations
+					NOT_IMPLEMENTED;
+					return false;
+				}
+
+				if (!EAT_TOKEN(Token_Comma)) break;
+
+				AST_Header* type = 0;
+				if (!Parser__ParseExpr(state, &type)) return false;
+
+				AST_Parameter* node = PUSH_NODE(Parameter);
+				node->next  = ASTPtr_Nil;
+				node->name  = ASTPtr_Nil;
+				node->value = ASTPtr_Nil;
+				ASTPtr_SetToPtr(&node->type, type);
+
+				ASTPtr_SetToPtr(param_link, node);
+				param_link = &node->next;
+			}
+		}
+		else
+		{
+			AST_Header* name = first;
+			AST_Ptr* param_link = 0;
+
+			for (;;)
+			{
+				AST_Header* type  = 0;
+				AST_Header* value = 0;
+
+				if (!EAT_TOKEN(Token_Colon))
+				{
+					//// ERROR: Missing type of parameter
+					NOT_IMPLEMENTED;
+					return false;
+				}
+
+				if (GET_TOKEN().kind != Token_Eq)
+				{
+					if (!Parser__ParseExpr(state, &type)) return false;
+				}
+
+				if (EAT_TOKEN(Token_Eq))
+				{
+					if (!Parser__ParseExpr(state, &value)) return false;
+				}
+
+				AST_Parameter* node = PUSH_NODE(Parameter);
+				node->next = ASTPtr_Nil;
+				ASTPtr_SetToPtr(&node->name, name);
+				ASTPtr_SetToPtr(&node->type, type);
+				ASTPtr_SetToPtr(&node->value, value);
+
+				if (param_link == 0) params = node;
+				else                 ASTPtr_SetToPtr(param_link, node);
+				param_link = &node->next;
+
+				if (!EAT_TOKEN(Token_Colon)) break;
+
+				if (!Parser__ParseExpr(state, &name)) return false;
+				continue;
+			}
+		}
+	}
+
+	if (!EAT_TOKEN(Token_CloseParen))
+	{
+		//// ERROR: Missing closing paren after parameter list
+		NOT_IMPLEMENTED;
+		return false;
+	}
+
+	AST_ReturnVal* return_vals = 0;
+	{
+		if (GET_TOKEN().kind == Token_Minus && PEEK_TOKEN().kind == Token_Gt)
+		{
+			NEXT_TOKEN();
+			NEXT_TOKEN();
+
+			if (GET_TOKEN().kind != Token_OpenParen)
+			{
+				AST_Header* type = 0;
+				if (!Parser__ParseExpr(state, &type)) return false;
+
+				AST_ReturnVal* node = PUSH_NODE(ReturnVal);
+				node->next = ASTPtr_Nil;
+				node->name = ASTPtr_Nil;
+				ASTPtr_SetToPtr(&node->type, type);
+
+				return_vals = node;
+			}
+			else
+			{
+				ASSERT(GET_TOKEN().kind == Token_OpenParen);
+				NEXT_TOKEN();
+
+				AST_Header* first = 0;
+				if (!Parser__ParseExpr(state, &first)) return false;
+
+				if (GET_TOKEN().kind == Token_Comma || GET_TOKEN().kind == Token_CloseParen)
+				{
+					// NOTE: This is the type only variant for the return val list i.e. (int, float, string)
+					//       and not the normal (name0: type0, name1: type1)
+
+					AST_ReturnVal* first_node = PUSH_NODE(ReturnVal);
+					first_node->next  = ASTPtr_Nil;
+					first_node->name  = ASTPtr_Nil;
+					ASTPtr_SetToPtr(&first_node->type, first);
+
+					return_vals = first_node;
+					AST_Ptr* return_val_link = &first_node->next;
+
+					for (;;)
+					{
+						if (GET_TOKEN().kind == Token_Colon)
+						{
+							//// ERROR: Illegal to mix type only and name, type return value variations
+							NOT_IMPLEMENTED;
+							return false;
+						}
+
+						if (!EAT_TOKEN(Token_Comma)) break;
+
+						AST_Header* type = 0;
+						if (!Parser__ParseExpr(state, &type)) return false;
+
+						AST_ReturnVal* node = PUSH_NODE(ReturnVal);
+						node->next  = ASTPtr_Nil;
+						node->name  = ASTPtr_Nil;
+						ASTPtr_SetToPtr(&node->type, type);
+
+						ASTPtr_SetToPtr(return_val_link, node);
+						return_val_link = &node->next;
+					}
+				}
+				else
+				{
+					AST_Header* name = first;
+					AST_Ptr* return_val_link = 0;
+
+					for (;;)
+					{
+						AST_Header* type = 0;
+
+						if (!EAT_TOKEN(Token_Colon))
+						{
+							//// ERROR: Missing type of return value
+							NOT_IMPLEMENTED;
+							return false;
+						}
+
+						if (GET_TOKEN().kind != Token_Eq)
+						{
+							if (!Parser__ParseExpr(state, &type)) return false;
+						}
+
+						if (GET_TOKEN().kind == Token_Eq)
+						{
+							//// ERROR: Return values do not support default values
+							NOT_IMPLEMENTED;
+							return false;
+						}
+
+						AST_ReturnVal* node = PUSH_NODE(ReturnVal);
+						node->next = ASTPtr_Nil;
+						ASTPtr_SetToPtr(&node->name, name);
+						ASTPtr_SetToPtr(&node->type, type);
+
+						if (return_val_link == 0) return_vals = node;
+						else                      ASTPtr_SetToPtr(return_val_link, node);
+						return_val_link = &node->next;
+
+						if (!EAT_TOKEN(Token_Colon)) break;
+
+						if (!Parser__ParseExpr(state, &name)) return false;
+						continue;
+					}
+				}
+
+				if (!EAT_TOKEN(Token_CloseParen))
+				{
+					//// ERROR: Missing closing paren after return value list
+					NOT_IMPLEMENTED;
+					return false;
+				}
+			}
+		}
+	}
+
+	if (GET_TOKEN().kind != Token_OpenBrace)
+	{
+		AST_ProcType* node = PUSH_NODE(ProcType);
+		ASTPtr_SetToPtr(&node->params, params);
+		ASTPtr_SetToPtr(&node->return_vals, return_vals);
+
+		*expr = &node->header;
+	}
+	else
+	{
+		ASSERT(GET_TOKEN().kind == Token_OpenBrace);
+
+		AST_Header* body = 0;
+		if (!Parser__ParseBlock(state, &body)) return false;
+
+		AST_ProcLit* node = PUSH_NODE(ProcLit);
+		ASTPtr_SetToPtr(&node->params, params);
+		ASTPtr_SetToPtr(&node->return_vals, return_vals);
+		ASTPtr_SetToPtr(&node->body, body);
+
+		*expr = &node->header;
+	}
+
+	return true;
+}
+
+static bool
+Parser__ParseStruct(Parser* state, AST_Header** expr)
+{
+	ASSERT(GET_TOKEN().kind == Token_Struct);
+	NEXT_TOKEN();
+
+	if (GET_TOKEN().kind != Token_OpenBrace)
+	{
+		//// ERROR: Missing struct body
+		NOT_IMPLEMENTED;
+		return false;
+	}
+
+	AST_Header* body = 0;
+	if (!Parser__ParseBlock(state, &body)) return false;
+
+	AST_StructType* node = 0;
+	ASTPtr_SetToPtr(&node->body, body);
+
+	*expr = &node->header;
+
+	return true;
+}
+
+static bool
+Parser__ParseEnum(Parser* state, AST_Header** expr)
+{
+	ASSERT(GET_TOKEN().kind == Token_Enum);
+	NEXT_TOKEN();
+
+	AST_Header* elem_type = 0;
+	if (GET_TOKEN().kind != Token_OpenBrace)
+	{
+		if (!Parser__ParseExpr(state, &elem_type)) return false;
+	}
+
+	if (GET_TOKEN().kind != Token_OpenBrace)
+	{
+		//// ERROR: Missing enum body
+		NOT_IMPLEMENTED;
+		return false;
+	}
+
+	AST_Header* body = 0;
+	if (!Parser__ParseBlock(state, &body)) return false;
+
+	AST_EnumType* node = 0;
+	ASTPtr_SetToPtr(&node->elem_type, elem_type);
+	ASTPtr_SetToPtr(&node->body, body);
+
+	*expr = &node->header;
 
 	return true;
 }
@@ -237,50 +563,15 @@ Parser__ParsePrimaryExpr(Parser* state, AST_Header** expr)
 	}
 	else if (token_kind == Token_Proc)
 	{
-		NEXT_TOKEN();
-
-		if (!EAT_TOKEN(Token_OpenParen))
-		{
-			//// ERROR: Missing parameter list
-			NOT_IMPLEMENTED;
-			return false;
-		}
-
-		AST_Header* params = 0;
-
-		for (;;)
-		{
-			proc(a, b, c := A())
-
-			AST_* node = 0;
-			node->next = ASTPtr_Nil;
-			NOT_IMPLEMENTED;
-
-			if (param_link == 0) params = node;
-			else                 ASTPtr_SetToPtr(param_link, node);
-
-			param_link = &node->next;
-
-			if (EAT_TOKEN(Token_Comma)) continue;
-			else                        break;
-		}
-
-		if (!EAT_TOKEN(Token_CloseParen))
-		{
-			//// ERROR: Missing closing paren after parameter list
-			NOT_IMPLEMENTED;
-			return false;
-		}
-
-		NOT_IMPLEMENTED;
+		if (!Parser__ParseProc(state, expr)) return false;
 	}
 	else if (token_kind == Token_Struct)
 	{
-		NOT_IMPLEMENTED;
+		if (!Parser__ParseStruct(state, expr)) return false;
 	}
 	else if (token_kind == Token_Enum)
 	{
-		NOT_IMPLEMENTED;
+		if (!Parser__ParseEnum(state, expr)) return false;
 	}
 	else if (token_kind == Token_Dot)
 	{
@@ -573,7 +864,108 @@ Parser__ParseExpr(Parser* state, AST_Header** expr)
 	return true;
 }
 
+static bool
+Parser__ParseBlock(Parser* state, AST_Header** block)
+{
+	ASSERT(GET_TOKEN().kind == Token_OpenBrace);
+	NEXT_TOKEN();
+
+	AST_Header* statements  = 0;
+	AST_Ptr* statement_link = 0;
+
+	for (;;)
+	{
+		if (EAT_TOKEN(Token_CloseBrace)) break;
+
+		AST_Header* statement = 0;
+		if (!Parser__ParseStatement(state, &statement)) return false;
+
+		if (statement_link == 0) statements = statement;
+		else                     ASTPtr_SetToPtr(statement_link, statement);
+
+		statement_link = &statement->next;
+	}
+
+	AST_Block* node = PUSH_NODE(Block);
+	node->next  = ASTPtr_Nil;
+	node->label = ASTPtr_Nil;
+	ASTPtr_Node(&node->statements, statements);
+
+	return true;
+}
+
+static bool
+Parser__ParseStatement(Parser* state, AST_Header** statement)
+{
+	if (GET_TOKEN(Token_OpenBrace))
+	{
+		if (!Parser__ParseBlock(state, statement)) return false;
+	}
+	else if (EAT_TOKEN(Token_If))
+	{
+		if (!EAT_TOKEN(Token_OpenParen))
+		{
+			//// ERROR: Missing paren before if condition
+			NOT_IMPLEMENTED;
+			return false;
+		}
+
+		while (i := 0; i < 10; ++i)
+		{
+		}
+
+		for (i in 0..<10)
+		{
+		}
+
+		for (key in hash_map)
+		{
+		}
+
+		AST_Header* condition = 0;
+		if (!Parser__ParseExpr(state, &condition)) return false;
+
+		if (!EAT_TOKEN(Token_CloseParen))
+		{
+			//// ERROR: Missing closing paren after if condition
+			NOT_IMPLEMENTED;
+			return false;
+		}
+
+		AST_Header* true_branch = 0;
+		if (!Parser__ParseStatement(state, &true_branch)) return false;
+
+		AST_Header* false_branch = 0;
+		if (EAT_TOKEN(Token_Else))
+		{
+			if (!Parser__ParseStatement(state, &false_branch)) return false;
+		}
+
+		AST_If* node = PUSH_NODE(If);
+		node->next  = ASTPtr_Nil;
+		node->label = ASTPtr_Nil;
+		ASTPtr_SetToPtr(&node->condition, condition);
+		ASTPtr_SetToPtr(&node->true_branch, true_branch);
+		ASTPtr_SetToPtr(&node->false_branch, false_branch);
+
+		*statement = &node->header;
+	}
+	else if (GET_TOKEN().kind == Token_Else)
+	{
+		//// ERROR: Illegal else without matching if
+		NOT_IMPLEMENTED;
+		return false;
+	}
+	else
+	{
+		NOT_IMPLEMENTED;
+	}
+
+	return true;
+}
+
 #undef GET_TOKEN
+#undef PEEK_TOKEN
 #undef GET_TOKEN_DATA
 #undef NEXT_TOKEN
 #undef EAT_TOKEN
