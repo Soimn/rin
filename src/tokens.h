@@ -24,7 +24,7 @@
 	REMAINING_KEYWORDS(Token_True,     't', 'r', "true")     \
 	REMAINING_KEYWORDS(Token_Union,    'u', 'n', "union")    \
 	REMAINING_KEYWORDS(Token_Using,    'u', 's', "using")    \
-	REMAINING_KEYWORDS(Token_When,     'w', 'h', "when")     \
+	REMAINING_KEYWORDS(Token_While,    'w', 'h', "while")    \
 
 typedef enum Token_Kind
 {

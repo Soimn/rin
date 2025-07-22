@@ -1,7 +1,8 @@
 typedef struct Parser
 {
-	u8* file_contents;
 	Token* token;
+	Virtual_Array* ast_array;
+	u8* file_contents;
 } Parser;
 
 static Token
@@ -45,12 +46,11 @@ Parser__EatToken(Parser* state, Token_Kind kind)
 }
 
 static void*
-Parser__PushNode(Parser* state, AST_Kind kind, umm size)
+Parser__PushNode(Parser* state, AST_Kind kind, umm size_div_4)
 {
-	NOT_IMPLEMENTED;
-	AST_Header* node = 0;
+	AST_Header* node = VA_PushN(state->ast_array, (u32)size_div_4);
 
-	Zero(node, size);
+	Zero(node, size_div_4*4);
 
 	node->kind = kind;
 
@@ -62,16 +62,16 @@ Parser__PushNode(Parser* state, AST_Kind kind, umm size)
 #define GET_TOKEN_DATA() Parser__GetTokenData(state)
 #define NEXT_TOKEN() Parser__NextToken(state)
 #define EAT_TOKEN(K) Parser__EatToken(state, (K))
-#define PUSH_NODE(N) (AST_##N*)Parser__PushNode(state, ASTKind_##N, sizeof(AST_##N))
-#define PUSH_GROUPED_NODE(T, K) (T*)Parser__PushNode(state, K, sizeof(T))
+#define PUSH_NODE(N) (AST_##N*)Parser__PushNode(state, ASTKind_##N, sizeof(AST_##N) / 4)
+#define PUSH_GROUPED_NODE(T, K) (T*)Parser__PushNode(state, K, sizeof(T) / 4)
 
 static bool Parser__ParseExpr(Parser* state, AST_Header** expr);
 static bool Parser__ParseTypePrefixExpr(Parser* state, AST_Header** expr);
-static bool Parser__ParseBlock(Parser* state, AST_Header** block);
-static bool Parser__ParseStatement(Parser* state, AST_Header** statement);
+static bool Parser__ParseBlock(Parser* state, AST_Linked_Header** block);
+static bool Parser__ParseStatement(Parser* state, AST_Linked_Header** statement, bool expect_semicolon);
 
 static bool
-Parser__ParseArguments(Parser* state, AST_Header** args)
+Parser__ParseArguments(Parser* state, AST_Linked_Header** args)
 {
 	AST_Ptr* link = 0;
 
@@ -97,7 +97,7 @@ Parser__ParseArguments(Parser* state, AST_Header** args)
 		if (name == 0) node->name = ASTPtr_Nil;
 		else           ASTPtr_SetToPtr(&node->name, name);
 
-		if (link == 0) *args = &node->header;
+		if (link == 0) *args = &node->linked_header;
 		else           ASTPtr_SetToPtr(link, node);
 
 		link = &node->next;
@@ -117,7 +117,7 @@ Parser__ParseDotStuff(Parser* state, AST_Header* lhs, AST_Header** expr)
 
 	if (EAT_TOKEN(Token_OpenBrace))
 	{
-		AST_Header* args = 0;
+		AST_Linked_Header* args = 0;
 		if (!Parser__ParseArguments(state, &args)) return false;
 
 		if (!EAT_TOKEN(Token_CloseBrace))
@@ -169,6 +169,7 @@ Parser__ParseProc(Parser* state, AST_Header** expr)
 	}
 
 	AST_Parameter* params = 0;
+	if (GET_TOKEN().kind != Token_CloseParen)
 	{
 		AST_Header* first = 0;
 		if (!Parser__ParseExpr(state, &first)) return false;
@@ -392,7 +393,7 @@ Parser__ParseProc(Parser* state, AST_Header** expr)
 	{
 		ASSERT(GET_TOKEN().kind == Token_OpenBrace);
 
-		AST_Header* body = 0;
+		AST_Linked_Header* body = 0;
 		if (!Parser__ParseBlock(state, &body)) return false;
 
 		AST_ProcLit* node = PUSH_NODE(ProcLit);
@@ -419,7 +420,7 @@ Parser__ParseStruct(Parser* state, AST_Header** expr)
 		return false;
 	}
 
-	AST_Header* body = 0;
+	AST_Linked_Header* body = 0;
 	if (!Parser__ParseBlock(state, &body)) return false;
 
 	AST_StructType* node = 0;
@@ -449,7 +450,7 @@ Parser__ParseEnum(Parser* state, AST_Header** expr)
 		return false;
 	}
 
-	AST_Header* body = 0;
+	AST_Linked_Header* body = 0;
 	if (!Parser__ParseBlock(state, &body)) return false;
 
 	AST_EnumType* node = 0;
@@ -675,7 +676,7 @@ Parser__ParsePostfixExpr(Parser* state, AST_Header** expr)
 		}
 		else if (EAT_TOKEN(Token_OpenParen))
 		{
-			AST_Header* args = 0;
+			AST_Linked_Header* args = 0;
 			if (!Parser__ParseArguments(state, &args)) return false;
 
 			if (!EAT_TOKEN(Token_CloseParen))
@@ -865,20 +866,20 @@ Parser__ParseExpr(Parser* state, AST_Header** expr)
 }
 
 static bool
-Parser__ParseBlock(Parser* state, AST_Header** block)
+Parser__ParseBlock(Parser* state, AST_Linked_Header** block)
 {
 	ASSERT(GET_TOKEN().kind == Token_OpenBrace);
 	NEXT_TOKEN();
 
-	AST_Header* statements  = 0;
-	AST_Ptr* statement_link = 0;
+	AST_Linked_Header* statements = 0;
+	AST_Ptr* statement_link       = 0;
 
 	for (;;)
 	{
 		if (EAT_TOKEN(Token_CloseBrace)) break;
 
-		AST_Header* statement = 0;
-		if (!Parser__ParseStatement(state, &statement)) return false;
+		AST_Linked_Header* statement = 0;
+		if (!Parser__ParseStatement(state, &statement, true)) return false;
 
 		if (statement_link == 0) statements = statement;
 		else                     ASTPtr_SetToPtr(statement_link, statement);
@@ -889,15 +890,65 @@ Parser__ParseBlock(Parser* state, AST_Header** block)
 	AST_Block* node = PUSH_NODE(Block);
 	node->next  = ASTPtr_Nil;
 	node->label = ASTPtr_Nil;
-	ASTPtr_Node(&node->statements, statements);
+	ASTPtr_SetToPtr(&node->statements, statements);
+
+	*block = &node->linked_header;
 
 	return true;
 }
 
 static bool
-Parser__ParseStatement(Parser* state, AST_Header** statement)
+Parser__ParseExprList(Parser* state, AST_Linked_Header** exprs)
 {
-	if (GET_TOKEN(Token_OpenBrace))
+	AST_Ptr* expr_link = 0;
+
+	for (;;)
+	{
+		AST_Expr* node = PUSH_NODE(Expr);
+		node->next = ASTPtr_Nil;
+
+		AST_Header* expr = 0;
+		if (!Parser__ParseExpr(state, &expr)) return false;
+
+		ASTPtr_SetToPtr(&node->expr, expr);
+
+		if (expr_link == 0) *exprs = &node->linked_header;
+		else                ASTPtr_SetToPtr(expr_link, node);
+
+		expr_link = &node->next;
+
+		if (EAT_TOKEN(Token_Comma)) continue;
+		else                        break;
+	}
+
+	return true;
+}
+
+static bool
+Parser__ParseStatement(Parser* state, AST_Linked_Header** statement, bool expect_semicolon)
+{
+	if (EAT_TOKEN(Token_Colon))
+	{
+		AST_Header* label = 0;
+		if (!Parser__ParseExpr(state, &label)) return false;
+
+		AST_Linked_Header* stmnt = 0;
+		if (!Parser__ParseStatement(state, &stmnt, expect_semicolon)) return false;
+
+		if      (stmnt->kind == ASTKind_Block) ASTPtr_SetToPtr(&((AST_Block*)stmnt)->label, label);
+		else if (stmnt->kind == ASTKind_If)    ASTPtr_SetToPtr(&((AST_If*)stmnt)->label, label);
+		else if (stmnt->kind == ASTKind_For)   ASTPtr_SetToPtr(&((AST_For*)stmnt)->label, label);
+		else if (stmnt->kind == ASTKind_While) ASTPtr_SetToPtr(&((AST_While*)stmnt)->label, label);
+		else
+		{
+			//// ERROR: Labels can only be applied to blocks, ifs, for and while loops
+			NOT_IMPLEMENTED;
+			return false;
+		}
+
+		*statement = stmnt;
+	}
+	else if (GET_TOKEN().kind == Token_OpenBrace)
 	{
 		if (!Parser__ParseBlock(state, statement)) return false;
 	}
@@ -910,20 +961,8 @@ Parser__ParseStatement(Parser* state, AST_Header** statement)
 			return false;
 		}
 
-		while (i := 0; i < 10; ++i)
-		{
-		}
-
-		for (i in 0..<10)
-		{
-		}
-
-		for (key in hash_map)
-		{
-		}
-
-		AST_Header* condition = 0;
-		if (!Parser__ParseExpr(state, &condition)) return false;
+		AST_Linked_Header* condition = 0;
+		if (!Parser__ParseStatement(state, &condition, false)) return false;
 
 		if (!EAT_TOKEN(Token_CloseParen))
 		{
@@ -932,13 +971,13 @@ Parser__ParseStatement(Parser* state, AST_Header** statement)
 			return false;
 		}
 
-		AST_Header* true_branch = 0;
-		if (!Parser__ParseStatement(state, &true_branch)) return false;
+		AST_Linked_Header* true_branch = 0;
+		if (!Parser__ParseStatement(state, &true_branch, true)) return false;
 
-		AST_Header* false_branch = 0;
+		AST_Linked_Header* false_branch = 0;
 		if (EAT_TOKEN(Token_Else))
 		{
-			if (!Parser__ParseStatement(state, &false_branch)) return false;
+			if (!Parser__ParseStatement(state, &false_branch, true)) return false;
 		}
 
 		AST_If* node = PUSH_NODE(If);
@@ -948,7 +987,7 @@ Parser__ParseStatement(Parser* state, AST_Header** statement)
 		ASTPtr_SetToPtr(&node->true_branch, true_branch);
 		ASTPtr_SetToPtr(&node->false_branch, false_branch);
 
-		*statement = &node->header;
+		*statement = &node->linked_header;
 	}
 	else if (GET_TOKEN().kind == Token_Else)
 	{
@@ -956,9 +995,224 @@ Parser__ParseStatement(Parser* state, AST_Header** statement)
 		NOT_IMPLEMENTED;
 		return false;
 	}
+	else if (EAT_TOKEN(Token_While))
+	{
+		if (!EAT_TOKEN(Token_OpenParen))
+		{
+			//// ERROR: Missing open paren before while loop header
+			NOT_IMPLEMENTED;
+			return false;
+		}
+
+		AST_Linked_Header* init      = 0;
+		AST_Linked_Header* condition = 0;
+		AST_Linked_Header* step      = 0;
+
+		AST_Linked_Header* first = 0;
+		if (!Parser__ParseStatement(state, &first, false)) return false;
+
+		if (GET_TOKEN().kind != Token_Semicolon)
+		{
+			// NOTE: This is the condition only variant of the while loop i.e. while (a == b)
+			condition = first;
+		}
+		else
+		{
+			// NOTE: This is the c style for loop variant of the while loop i.e. while (i := 0; i < 10; ++i)
+			ASSERT(GET_TOKEN().kind == Token_Semicolon);
+			NEXT_TOKEN();
+
+			init = first;
+
+			if (!Parser__ParseStatement(state, &condition, false)) return false;
+
+			if (!EAT_TOKEN(Token_Semicolon))
+			{
+				//// ERROR: Missing semicolon after condition in init, condition, step variant while loop
+				NOT_IMPLEMENTED;
+				return false;
+			}
+
+			if (!Parser__ParseStatement(state, &step, false)) return false;
+		}
+
+		if (!EAT_TOKEN(Token_CloseParen))
+		{
+			//// ERROR: Missing close paren after while loop header
+			NOT_IMPLEMENTED;
+			return false;
+		}
+
+		NOT_IMPLEMENTED;
+	}
+	else if (EAT_TOKEN(Token_For))
+	{
+		// TODO
+		NOT_IMPLEMENTED;
+	}
+	else if (EAT_TOKEN(Token_Break))
+	{
+		AST_Header* label = 0;
+		if (GET_TOKEN().kind != Token_Semicolon)
+		{
+			if (!Parser__ParseExpr(state, &label)) return false;
+		}
+
+		if (expect_semicolon && !EAT_TOKEN(Token_Semicolon))
+		{
+			//// ERROR: Missing terminating semicolon after break statement
+			NOT_IMPLEMENTED;
+			return false;
+		}
+
+		AST_Break* node = PUSH_NODE(Break);
+		node->next = ASTPtr_Nil;
+		ASTPtr_SetToPtr(&node->label, label);
+
+		*statement = &node->linked_header;
+	}
+	else if (EAT_TOKEN(Token_Continue))
+	{
+		AST_Header* label = 0;
+		if (GET_TOKEN().kind != Token_Semicolon)
+		{
+			if (!Parser__ParseExpr(state, &label)) return false;
+		}
+
+		if (expect_semicolon && !EAT_TOKEN(Token_Semicolon))
+		{
+			//// ERROR: Missing terminating semicolon after continue statement
+			NOT_IMPLEMENTED;
+			return false;
+		}
+
+		AST_Continue* node = PUSH_NODE(Continue);
+		node->next = ASTPtr_Nil;
+		ASTPtr_SetToPtr(&node->label, label);
+
+		*statement = &node->linked_header;
+	}
+	else if (EAT_TOKEN(Token_Return))
+	{
+		AST_Linked_Header* args = 0;
+		if (GET_TOKEN().kind != Token_Semicolon)
+		{
+			if (!Parser__ParseArguments(state, &args)) return false;
+		}
+
+		if (expect_semicolon && !EAT_TOKEN(Token_Semicolon))
+		{
+			//// ERROR: Missing terminating semicolon after return statement
+			NOT_IMPLEMENTED;
+			return false;
+		}
+
+		AST_Return* node = PUSH_NODE(Return);
+		node->next = ASTPtr_Nil;
+		ASTPtr_SetToPtr(&node->args, args);
+
+		*statement = &node->linked_header;
+	}
 	else
 	{
-		NOT_IMPLEMENTED;
+		AST_Linked_Header* exprs = 0;
+		if (!Parser__ParseExprList(state, &exprs)) return false;
+
+		if (EAT_TOKEN(Token_Colon))
+		{
+			AST_Linked_Header* names  = exprs;
+			AST_Linked_Header* types  = 0;
+			AST_Linked_Header* values = 0;
+
+			if (GET_TOKEN().kind != Token_Eq && GET_TOKEN().kind != Token_Colon)
+			{
+				if (!Parser__ParseExprList(state, &types)) return false;
+			}
+
+			if (EAT_TOKEN(Token_Colon))
+			{
+				if (!Parser__ParseExprList(state, &values)) return false;
+
+				if (expect_semicolon && !EAT_TOKEN(Token_Semicolon))
+				{
+					//// ERROR: Missing terminating semicolon after constant declaration
+					NOT_IMPLEMENTED;
+					return false;
+				}
+
+				AST_Constant* node = PUSH_NODE(Constant);
+				node->next = ASTPtr_Nil;
+				ASTPtr_SetToPtr(&node->names, names);
+				ASTPtr_SetToPtr(&node->types, types);
+				ASTPtr_SetToPtr(&node->values, values);
+
+				*statement = &node->linked_header;
+			}
+			else
+			{
+				if (EAT_TOKEN(Token_Eq))
+				{
+					if (!Parser__ParseExprList(state, &values)) return false;
+				}
+
+				if (expect_semicolon && !EAT_TOKEN(Token_Semicolon))
+				{
+					//// ERROR: Missing terminating semicolon after variable declaration
+					NOT_IMPLEMENTED;
+					return false;
+				}
+
+				AST_Variable* node = PUSH_NODE(Variable);
+				node->next = ASTPtr_Nil;
+				ASTPtr_SetToPtr(&node->names, names);
+				ASTPtr_SetToPtr(&node->types, types);
+				ASTPtr_SetToPtr(&node->values, values);
+
+				*statement = &node->linked_header;
+			}
+		}
+		else if (TOKEN_KIND__IS_ASS(GET_TOKEN().kind))
+		{
+			Token_Kind token_kind = GET_TOKEN().kind;
+			NEXT_TOKEN();
+
+			AST_Kind ass_op = ASTKind_Invalid;
+			if (token_kind != Token_Eq)
+			{
+				ass_op = AST_KIND__BINARY_FROM_TOKEN(TOKEN_KIND__ASS_TO_BINARY(token_kind));
+			}
+
+			AST_Linked_Header* lhs = exprs;
+			AST_Linked_Header* rhs = 0;
+
+			if (!Parser__ParseExprList(state, &rhs)) return false;
+
+			if (expect_semicolon && !EAT_TOKEN(Token_Semicolon))
+			{
+				//// ERROR: Missing terminating semicolon after assignment statement
+				NOT_IMPLEMENTED;
+				return false;
+			}
+
+			AST_Assignment* node = PUSH_NODE(Assignment);
+			node->next = ASTPtr_Nil;
+			node->op   = ass_op;
+			ASTPtr_SetToPtr(&node->lhs, lhs);
+			ASTPtr_SetToPtr(&node->rhs, rhs);
+
+			*statement = &node->linked_header;
+		}
+		else
+		{
+			*statement = exprs;
+
+			if (expect_semicolon && !EAT_TOKEN(Token_Semicolon))
+			{
+				//// ERROR: Missing terminating semicolon after expression statement
+				NOT_IMPLEMENTED;
+				return false;
+			}
+		}
 	}
 
 	return true;

@@ -92,7 +92,19 @@ typedef enum AST_Kind
 	ASTKind__FirstStatement,
 	ASTKind_Block = ASTKind__FirstStatement,
 	ASTKind_If,
+	ASTKind_While,
+	ASTKind_For,
+	ASTKind_Break,
+	ASTKind_Continue,
+	ASTKind_Return,
+	ASTKind_Expr,
+	ASTKind_Assignment,
 	ASTKind__PastLastStatement,
+
+	ASTKind__FirstDeclaration,
+	ASTKind_Constant = ASTKind__FirstDeclaration,
+	ASTKind_Variable,
+	ASTKind__PastLastDeclaration,
 } AST_Kind;
 
 #if 1
@@ -130,7 +142,7 @@ typedef __declspec(align(4)) struct AST_Linked_Header
 	AST_Ptr next;
 } AST_Linked_Header;
 
-#define AST_LINKED_HEADER struct AST_Linked_Header
+#define AST_LINKED_HEADER union { struct AST_Linked_Header; AST_Linked_Header linked_header; }
 
 // -- Primary expressions
 
@@ -354,3 +366,69 @@ typedef struct AST_If
 	AST_Ptr true_branch;
 	AST_Ptr false_branch;
 } AST_If;
+
+typedef struct AST_While
+{
+	AST_LINKED_HEADER;
+	AST_Ptr label;
+	AST_Ptr init;
+	AST_Ptr condition;
+	AST_Ptr step;
+	AST_Ptr body;
+} AST_While;
+
+typedef struct AST_For
+{
+	AST_LINKED_HEADER;
+	AST_Ptr label;
+	// TODO
+} AST_For;
+
+typedef struct AST_Break
+{
+	AST_LINKED_HEADER;
+	AST_Ptr label;
+} AST_Break;
+
+typedef struct AST_Continue
+{
+	AST_LINKED_HEADER;
+	AST_Ptr label;
+} AST_Continue;
+
+typedef struct AST_Return
+{
+	AST_LINKED_HEADER;
+	AST_Ptr args;
+} AST_Return;
+
+typedef struct AST_Expr
+{
+	AST_LINKED_HEADER;
+	AST_Ptr expr;
+} AST_Expr;
+
+typedef struct AST_Assignment
+{
+	AST_LINKED_HEADER;
+	AST_Kind op;
+	AST_Ptr lhs;
+	AST_Ptr rhs;
+} AST_Assignment;
+
+// -- Declarations
+typedef struct AST_Constant
+{
+	AST_LINKED_HEADER;
+	AST_Ptr names;
+	AST_Ptr types;
+	AST_Ptr values;
+} AST_Constant;
+
+typedef struct AST_Variable
+{
+	AST_LINKED_HEADER;
+	AST_Ptr names;
+	AST_Ptr types;
+	AST_Ptr values;
+} AST_Variable;
