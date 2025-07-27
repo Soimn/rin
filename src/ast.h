@@ -26,6 +26,7 @@ typedef enum AST_Kind
 	ASTKind_PointerTo = ASTKind__FirstTypePrefixExpr,
 	ASTKind_SliceOf,
 	ASTKind_ArrayOf,
+	ASTKind_DistinctOf,
 	ASTKind__PastLastTypePrefixExpr,
 
 	ASTKind__FirstPostfixExpr,
@@ -255,6 +256,12 @@ typedef struct AST_ArrayOf
 	AST_Ptr len;
 	AST_Ptr elem_type;
 } AST_ArrayOf;
+
+typedef struct AST_DistinctOf
+{
+	AST_HEADER;
+	AST_Ptr elem_type;
+} AST_DistinctOf;
 
 // -- Postfix
 

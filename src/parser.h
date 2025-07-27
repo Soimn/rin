@@ -649,6 +649,16 @@ Parser__ParseTypePrefixExpr(Parser* state, AST_Header** expr)
 				link = &node->elem_type;
 			}
 		}
+		else if (EAT_TOKEN(Token_Distinct))
+		{
+			AST_DistinctOf* node = PUSH_NODE(DistinctOf);
+			node->elem_type = ASTPtr_Nil;
+
+			if (link == 0) *expr = &node->header;
+			else           ASTPtr_SetToPtr(link, node);
+
+			link = &node->elem_type;
+		}
 		else break;
 	}
 
@@ -876,6 +886,10 @@ Parser__ParseBlock(Parser* state, AST_Linked_Header** block)
 
 	for (;;)
 	{
+		// NOTE: Skip stray semicolons before trying to parse a statement because this
+		//       avoids special casing the "statement_link" linking
+		while (EAT_TOKEN(Token_Semicolon));
+
 		if (EAT_TOKEN(Token_CloseBrace)) break;
 
 		AST_Linked_Header* statement = 0;
@@ -1213,6 +1227,39 @@ Parser__ParseStatement(Parser* state, AST_Linked_Header** statement, bool expect
 				return false;
 			}
 		}
+	}
+
+	return true;
+}
+
+static bool
+ParseFile(u8* file_contents, Token* tokens, u32 tokens_len, Virtual_Array* ast_array, AST_Linked_Header** ast)
+{
+	ASSERT(tokens_len > 0 && tokens[tokens_len-1].kind == Token_EOF);
+
+	Parser* state = &(Parser){
+		.token         = tokens,
+		.ast_array     = ast_array,
+		.file_contents = file_contents,
+	};
+
+	AST_Ptr* statement_link = 0;
+
+	for (;;)
+	{
+		// NOTE: Skip stray semicolons before trying to parse a statement because this
+		//       avoids special casing the "statement_link" linking
+		while (EAT_TOKEN(Token_Semicolon));
+
+		if (GET_TOKEN().kind == Token_EOF) break;
+
+		AST_Linked_Header* statement = 0;
+		if (!Parser__ParseStatement(state, &statement, true)) return false;
+
+		if (statement_link == 0) *ast = statement;
+		else                     ASTPtr_SetToPtr(statement_link, statement);
+
+		statement_link = &statement->next;
 	}
 
 	return true;
