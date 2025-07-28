@@ -118,6 +118,8 @@ typedef struct { s32 off; } AST_Ptr;
 #define ASTPtr_SetToPtr(ASTPTR, PTR) (*(ASTPTR) = ASTPtr_FromPtr(ASTPTR, PTR))
 
 #define ASTPtr_Nil (AST_Ptr){0}
+
+#define ASTPtr_IsNil(ASTPTR) ((ASTPTR)->off == 0)
 #else
 typedef void* AST_Ptr;
 
@@ -128,6 +130,8 @@ typedef void* AST_Ptr;
 #define ASTPtr_SetToPtr(ASTPTR, PTR) (*(ASTPTR) = (PTR))
 
 #define ASTPtr_Nil 0
+
+#define ASTPtr_IsNil(ASTPTR) ((ASTPTR) == 0)
 #endif
 
 typedef __declspec(align(4)) struct AST_Header
@@ -183,8 +187,7 @@ typedef struct AST_Int
 typedef struct AST_Int128
 {
 	AST_HEADER;
-	u64 value_lo;
-	u64 value_hi;
+	u128 value;
 } AST_Int128;
 #pragma pack(pop)
 
@@ -268,27 +271,27 @@ typedef struct AST_DistinctOf
 typedef struct AST_Deref
 {
 	AST_HEADER;
-	AST_Ptr expr;
+	AST_Ptr operand;
 } AST_Deref;
 
 typedef struct AST_Call
 {
 	AST_HEADER;
-	AST_Ptr expr;
+	AST_Ptr operand;
 	AST_Ptr args;
 } AST_Call;
 
 typedef struct AST_Index
 {
 	AST_HEADER;
-	AST_Ptr expr;
+	AST_Ptr operand;
 	AST_Ptr index;
 } AST_Index;
 
 typedef struct AST_Slice
 {
 	AST_HEADER;
-	AST_Ptr expr;
+	AST_Ptr operand;
 	AST_Ptr start_index;
 	AST_Ptr past_end_index;
 } AST_Slice;
@@ -296,14 +299,14 @@ typedef struct AST_Slice
 typedef struct AST_Member
 {
 	AST_HEADER;
-	AST_Ptr expr;
+	AST_Ptr operand;
 	AST_Ptr name;
 } AST_Member;
 
 typedef struct AST_StructLit
 {
 	AST_HEADER;
-	AST_Ptr type;
+	AST_Ptr operand;
 	AST_Ptr args;
 } AST_StructLit;
 

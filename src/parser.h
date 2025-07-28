@@ -128,7 +128,7 @@ Parser__ParseDotStuff(Parser* state, AST_Header* lhs, AST_Header** expr)
 		}
 
 		AST_StructLit* node = PUSH_NODE(StructLit);
-		ASTPtr_SetToPtr(&node->type, lhs);
+		ASTPtr_SetToPtr(&node->operand, lhs);
 		ASTPtr_SetToPtr(&node->args, args);
 
 		*expr = &node->header;
@@ -139,7 +139,7 @@ Parser__ParseDotStuff(Parser* state, AST_Header* lhs, AST_Header** expr)
 		if (!Parser__ParseTypePrefixExpr(state, &name)) return false;
 
 		AST_Member* node = PUSH_NODE(Member);
-		ASTPtr_SetToPtr(&node->expr, lhs);
+		ASTPtr_SetToPtr(&node->operand, lhs);
 		ASTPtr_SetToPtr(&node->name, name);
 
 		*expr = &node->header;
@@ -515,10 +515,10 @@ Parser__ParsePrimaryExpr(Parser* state, AST_Header** expr)
 
 		AST_Int128* node = PUSH_NODE(Int128);
 
-		node->value_lo= GET_TOKEN_DATA().integer;
+		node->value.lo= GET_TOKEN_DATA().integer;
 		NEXT_TOKEN();
 
-		node->value_hi = GET_TOKEN_DATA().integer;
+		node->value.hi = GET_TOKEN_DATA().integer;
 		NEXT_TOKEN();
 
 		*expr = &node->header;
@@ -681,7 +681,7 @@ Parser__ParsePostfixExpr(Parser* state, AST_Header** expr)
 		if (EAT_TOKEN(Token_Hat))
 		{
 			AST_Deref* node = PUSH_NODE(Deref);
-			ASTPtr_SetToPtr(&node->expr, *expr);
+			ASTPtr_SetToPtr(&node->operand, *expr);
 			*expr = &node->header;
 		}
 		else if (EAT_TOKEN(Token_OpenParen))
@@ -697,7 +697,7 @@ Parser__ParsePostfixExpr(Parser* state, AST_Header** expr)
 			}
 
 			AST_Call* node = PUSH_NODE(Call);
-			ASTPtr_SetToPtr(&node->expr, *expr);
+			ASTPtr_SetToPtr(&node->operand, *expr);
 			ASTPtr_SetToPtr(&node->args, args);
 
 			*expr = &node->header;
@@ -724,7 +724,7 @@ Parser__ParsePostfixExpr(Parser* state, AST_Header** expr)
 				}
 
 				AST_Slice* node = PUSH_NODE(Slice);
-				ASTPtr_SetToPtr(&node->expr, *expr);
+				ASTPtr_SetToPtr(&node->operand, *expr);
 				ASTPtr_SetToPtr(&node->start_index, index);
 				ASTPtr_SetToPtr(&node->past_end_index, past_end_index);
 
@@ -740,7 +740,7 @@ Parser__ParsePostfixExpr(Parser* state, AST_Header** expr)
 				}
 
 				AST_Index* node = PUSH_NODE(Index);
-				ASTPtr_SetToPtr(&node->expr, *expr);
+				ASTPtr_SetToPtr(&node->operand, *expr);
 				ASTPtr_SetToPtr(&node->index, index);
 
 				*expr = &node->header;

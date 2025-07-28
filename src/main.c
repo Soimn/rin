@@ -37,6 +37,7 @@ double strtod(const char* str, char** endptr);
 #include "float_parsing.h"
 #include "memory.h"
 #include "virtual_array.h"
+#include "u128.h"
 #include "tokens.h"
 #include "lexer.h"
 #include "ast.h"

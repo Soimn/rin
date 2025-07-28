@@ -1,22 +1,18 @@
 typedef enum Type_Info_Kind
 {
-	TypeInfo_SignedInt,
-	TypeInfo_UnsignedInt,
-	TypeInfo_Float,
-	TypeInfo_Bool,
-	TypeInfo_String,
+	TypeInfoKind_Basic = 0,
+	TypeInfoKind_Proc,
+	TypeInfoKind_Struct,
+	TypeInfoKind_Enum,
 
-	TypeInfo_Proc,
-	TypeInfo_Struct,
-	TypeInfo_Enum,
-
-	TypeInfo_Distinct,
-	TypeInfo_Pointer,
-	TypeInfo_Slice,
-	TypeInfo_Array,
+	TypeInfoKind_Pointer,
+	TypeInfoKind_Slice,
+	TypeInfoKind_Array,
 
 	TypeInfoKind__Count,
 } Type_Info_Kind;
+
+typedef struct { u32 val; } Typeid;
 
 // NOTE: There are ~65 million identifiers in the linux source code ~= 2^26.
 //       Assuming that these are all unique types and have <= 4 variants
@@ -27,78 +23,108 @@ typedef enum Type_Info_Kind
 //       element type.
 #define TYPEID_KIND_BITS 4
 #define TYPEID_ID_BITS (32 - TYPEID_KIND_BITS)
-#define TYPEID_KIND(TID) ((TID) >> TYPEID_ID_BITS)
-#define TYPEID_ID(TID) ((TID) & (~(u32)0 >> TYPEID_KIND_BITS))
+#define TYPEID_KIND(TID) (Type_Info_Kind)((TID).val >> TYPEID_ID_BITS)
+#define TYPEID_ID(TID) ((TID).val & (~(u32)0 >> TYPEID_KIND_BITS))
 
 static_assert(TypeInfoKind__Count < (1 << TYPEID_KIND_BITS), "Too many type kinds");
 
-typedef struct Typeid
+typedef enum Type_Info_Basic_Kind
 {
-	u32 value;
-} Typeid;
+	TypeInfoBasicKind__FirstSoft,
+	TypeInfoBasicKind_SoftInt = TypeInfoBasicKind__FirstSoft,
+	TypeInfoBasicKind_SoftFloat,
+	TypeInfoBasicKind_SoftBool,
+	TypeInfoBasicKind_SoftString,
+	TypeInfoBasicKind__PastLastSoft,
 
-typedef struct Type_Info
+	TypeInfoBasicKind_Int,
+	TypeInfoBasicKind_Float,
+	TypeInfoBasicKind_Bool,
+	TypeInfoBasicKind_String,
+	TypeInfoBasicKind_Typeid,
+} Type_Info_Basic_Kind;
+
+typedef struct TypeInfo_Basic
 {
-	Typeid type_id;
+	u8 kind;
+	u8 size;
+	u16 bit_size;
+	Typeid aliased_type;
+} TypeInfo_Basic;
 
-	union
-	{
-		Typeid elem_type;
+// TODO
+Typeid Typeid_Typeid     = {0};
+Typeid Typeid_SoftInt    = {0};
+Typeid Typeid_SoftFloat  = {0};
+Typeid Typeid_SoftBool   = {0};
+Typeid Typeid_SoftString = {0};
 
-		struct
-		{
-			Typeid elem_type;
-			u32 len;
-		} array;
-	};
+static bool
+Typeid_Equal(Typeid a, Typeid b)
+{
+	return (a.val == b.val);
+}
 
-	Typeid back_edges[TypeInfoKind__Count];
-} Type_Info;
-
-static Typeid
-Typeid_Distinct(Typeid type)
+static bool
+Typeid_IsInteger(Typeid tid)
 {
 	NOT_IMPLEMENTED;
+	(void)tid;
+	return false;
+}
+
+static bool
+Typeid_IsPointer(Typeid tid)
+{
+	NOT_IMPLEMENTED;
+	(void)tid;
+	return false;
+}
+
+static Typeid
+Typeid_ElementType(Typeid tid)
+{
+	NOT_IMPLEMENTED;
+	(void)tid;
+	return (Typeid){0};
+}
+
+static bool
+Typeid_IsImplicitlyConvertibleToBool(Typeid tid)
+{
+	NOT_IMPLEMENTED;
+	(void)tid;
+	return false;
+}
+
+static bool
+Typeid_HasCommonType(Typeid a, Typeid b, Typeid* common_type)
+{
+	NOT_IMPLEMENTED;
+	(void)a, b, common_type;
+	return false;
 }
 
 static Typeid
 Typeid_PointerTo(Typeid elem_type)
 {
 	NOT_IMPLEMENTED;
+	(void)elem_type;
+	return (Typeid){0};
 }
 
 static Typeid
 Typeid_SliceOf(Typeid elem_type)
 {
 	NOT_IMPLEMENTED;
+	(void)elem_type;
+	return (Typeid){0};
 }
 
 static Typeid
-Typeid_ArrayOf(Typeid elem_type, umm len)
+Typeid_ArrayOf(Typeid elem_type, u32 len)
 {
 	NOT_IMPLEMENTED;
-}
-
-static Typeid
-Typeid_Proc()
-{
-	NOT_IMPLEMENTED;
-}
-
-static Typeid
-Typeid_Struct()
-{
-	NOT_IMPLEMENTED;
-}
-
-static Typeid
-Typeid_Enum()
-{
-	NOT_IMPLEMENTED;
-}
-
-static Type_Info*
-TypeInfo_FromTypeid(Typeid type)
-{
-	NOT_IMPLEMENTED;
+	(void)elem_type, len;
+	return (Typeid){0};
 }
