@@ -16,14 +16,6 @@ typedef enum Value_Flag
 	ValueFlag_ComptimeKnown = 1,
 } Value_Flag;
 
-static Value
-Value_Cast(Value val, Typeid src_type, Typeid dst_type)
-{
-	NOT_IMPLEMENTED;
-	(void)val, src_type, dst_type;
-	return (Value){0};
-}
-
 typedef struct Check_Result
 {
 	Typeid type;
@@ -37,7 +29,191 @@ Checker__CheckExpr(Checker* state, AST_Header* expr)
 {
 	if (expr->kind >= ASTKind__FirstBinaryExpr && expr->kind < ASTKind__PastLastBinaryExpr)
 	{
-		NOT_IMPLEMENTED;
+		AST_Binary_Expr* binary = (AST_Binary_Expr*)expr;
+
+		if (ASTPtr_IsNil(&expr->lhs))
+		{
+			// NOTE: This is not possible with parsed code, but can happen with a generated AST
+			//// ERROR: Missing left operand to binary operator
+			NOT_IMPLEMENTED;
+			return (Check_Result){ .valid = false };
+		}
+
+		Check_Result left = Checker__CheckExpr(state, ASTPtr_ToPtr(&binary->lhs));
+		if (!left.valid) return left;
+
+		if (ASTPtr_IsNil(&expr->rhs))
+		{
+			// NOTE: This is not possible with parsed code, but can happen with a generated AST
+			//// ERROR: Missing right operand to binary operator
+			NOT_IMPLEMENTED;
+			return (Check_Result){ .valid = false };
+		}
+
+		Check_Result right = Checker__CheckExpr(state, ASTPtr_ToPtr(&binary->rhs));
+		if (!right.valid) return right;
+
+		if (binary->kind == ASTKind_Shl || binary->kind == ASTKind_Shr)
+		{
+			if (!Typeid_IsInteger(left.type))
+			{
+				//// ERROR: Left operand to shift operator must be of an integer type
+				NOT_IMPLEMENTED;
+				return (Check_Result){ .valid = false };
+			}
+			else if (!Typeid_IsInteger(right.type))
+			{
+				//// ERROR: Right operand to shift operator must be of an integer type
+				NOT_IMPLEMENTED;
+				return (Check_Result){ .valid = false };
+			}
+
+			if (Typeid_IsSoft(left.type) && !(right.value_flags & ValueFlag_ComptimeKnown))
+			{
+				//// ERROR: Right operand of shift operator with a soft left operand must be known at compile time
+				NOT_IMPLEMENTED;
+				return (Check_Result){ .valid = false };
+			}
+
+			if ((left.value_flags & ValueFlag_ComptimeKnown) && (right.value_flags & ValueFlag_ComptimeKnown))
+			{
+NOT_IMPLEMENTED;
+
+				return (Check_Result){
+					.type        = left.type,
+					.value       = ,
+					.value_flags = ValueFlag_ComptimeKnown,
+					.valid       = true,
+				};
+			}
+			else
+			{
+				return (Check_Result){
+					.type        = left.type,
+					.value       = {0},
+					.value_flags = 0,
+					.valid       = true,
+				};
+			}
+		}
+		else
+		{
+			Typeid common_type;
+			Value left_value;
+			Value right_value;
+
+			if (Typeid_Equal(left.type, right.type))
+			{
+				common_type = left.type;
+				left_value  = left.value;
+				right_value = right.value;
+			}
+			else if (Typeid_IsSoft(left.type) && Typeid_IsSoft(right.type))
+			{
+				// NOTE: This makes 2*2.1 possible and is added as an edge case since 2.0*2.1 feels dumb
+				if (Typeid_Equal(left.type, Typeid_SoftInt) && Typeid_Equal(right.type, Typeid_SoftFloat))
+				{
+					common_type = Typeid_SoftFloat;
+					left_value  = ;
+					right_value = right.value;
+				}
+				else if (Typeid_Equal(left.type, Typeid_SoftInt) && Typeid_Equal(right.type, Typeid_SoftFloat))
+				{
+					common_type = Typeid_SoftFloat;
+					left_value  = left.value;
+					right_value = ;
+				}
+				else
+				{
+					//// ERROR: No common soft type
+					NOT_IMPLEMENTED;
+					return (Check_Result){ .valid = false };
+				}
+			}
+			else if (Typeid_IsSoft(left.type))
+			{
+				if (!)
+				{
+					//// ERROR: Cannot harden x to y
+					NOT_IMPLEMENTED;
+					return (Check_Result){ .valid = false };
+				}
+				else
+				{
+					common_type = right.type;
+				}
+			}
+			else if (Typeid_IsSoft(right.type))
+			{
+				if (!)
+				{
+					//// ERROR: Cannot harden x to y
+					NOT_IMPLEMENTED;
+					return (Check_Result){ .valid = false };
+				}
+				else
+				{
+					common_type = left.type;
+				}
+			}
+			else
+			{
+				//// ERROR: No common type
+				NOT_IMPLEMENTED;
+				return (Check_Result){ .valid = false };
+			}
+
+			switch (binary->kind)
+			{
+				// int & float
+				case ASTKind_Mul:
+				case ASTKind_Div:
+				case ASTKind_Rem:
+				case ASTKind_Add:
+				case ASTKind_Sub:
+				{
+					NOT_IMPLEMENTED;
+				} break;
+
+				// int & bool
+				case ASTKind_And:
+				case ASTKind_Or:
+				case ASTKind_Xor:
+				{
+					NOT_IMPLEMENTED;
+				} break;
+
+				// int, float, bool
+				case ASTKind_CmpEq:
+				case ASTKind_CmpNeq:
+				{
+					NOT_IMPLEMENTED;
+				} break;
+
+				// int, float
+				case ASTKind_CmpLt:
+				case ASTKind_CmpLtEq:
+				case ASTKind_CmpGt:
+				case ASTKind_CmpGtEq:
+				{
+					NOT_IMPLEMENTED;
+				} break;
+
+				// boolean
+				case ASTKind_LAnd:
+				case ASTKind_LOr:
+				{
+					NOT_IMPLEMENTED;
+				} break;
+
+				default:
+				{
+					//// ERROR: Illegal kind
+					NOT_IMPLEMENTED;
+					return (Check_Result){ .valid = false };
+				} break;
+			}
+		}
 	}
 	else
 	{
@@ -370,7 +546,7 @@ Checker__CheckExpr(Checker* state, AST_Header* expr)
 				Check_Result condition = Checker__CheckExpr(state, ASTPtr_ToPtr(&conditional->condition));
 				if (!condition.valid) return condition;
 
-				if (!Typeid_IsImplicitlyConvertibleToBool(condition.type))
+				if (!Typeid_IsBoolean(condition.type))
 				{
 					//// ERROR: Condition of conditional expression must be implicitly convertible to bool
 					NOT_IMPLEMENTED;
@@ -398,37 +574,8 @@ Checker__CheckExpr(Checker* state, AST_Header* expr)
 
 				Check_Result false_val = Checker__CheckExpr(state, ASTPtr_ToPtr(&conditional->false_val));
 				if (!false_val.valid) return false_val;
-				
-				Typeid common_type;
-				if (!Typeid_HasCommonType(true_val.type, false_val.type, &common_type))
-				{
-					//// ERROR: No common type between true and false value of conditional expression
-					NOT_IMPLEMENTED;
-					return (Check_Result){ .valid = false };
-				}
 
-				Value condition_value = Value_Cast(condition.value, condition.type, Typeid_SoftBool);
-
-				Check_Result* chosen_value = (condition_value.boolean ? &true_val : &false_val);
-
-				if ((condition.value_flags & ValueFlag_ComptimeKnown) && (chosen_value->value_flags & ValueFlag_ComptimeKnown))
-				{
-					return (Check_Result){
-						.type        = common_type,
-						.value       = Value_Cast(chosen_value->value, chosen_value->type, common_type),
-						.value_flags = ValueFlag_ComptimeKnown,
-						.valid       = true,
-					};
-				}
-				else
-				{
-					return (Check_Result){
-						.type        = common_type,
-						.value       = {0},
-						.value_flags = 0,
-						.valid       = true,
-					};
-				}
+				NOT_IMPLEMENTED;
 			} break;
 
 			default:

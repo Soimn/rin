@@ -1,0 +1,56 @@
+what type is 2?
+what type is 2.0?
+what type is 0?
+what type is true?
+what type is 0 == 0?
+
+fix the problem with c where 1 << 33 is UB and everything being promoted to int semantically. (like doing the ops wider is totally fine but it should never change the result)
+
+constant expressions that are effectively infinite precision
+no implicit casting except from constants to actual values
+
+now
+f32 f;
+2*f
+is an error, which is annoying
+
+add implicit conversion from constant int to constant float, but not the other way around
+
+"constants" are called soft types because they can be shaped to a degree, while hard types are set and cannot change
+
+what about procedures that don't return anything?
+should there be a "void" type, or a "nil" typeid?
+none of the above
+or maybe
+nil typeid represents no type
+
+
+untyped int << u32   : untyped int / u32
+u32 << untyped int   : u32
+
+untyped int < 0 -> u32 requires cast
+
+trans(T) operator which reinterprets the data
+
+
+signedness should not implicitly change
+narrowing conversion should not happen implicitly
+widening conversion should ???
+
+
+a: s64
+b: u8
+
+c := a + b
+c := a + s64(b)
+
+implicit conversions can be added later
+
+start with no implicit conversion between variables or constants that have an assigned type
+
+what to do with literals?
+odin: literals have no type until forced
+c: literals have a type and will implicitly convert
+
+integer literals are of type soft_int
+this is a specialy type that is effectively an int that can implicitly be converted to any other integer type if the round trip conversion is lossless

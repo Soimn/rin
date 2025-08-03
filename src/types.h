@@ -90,18 +90,10 @@ Typeid_ElementType(Typeid tid)
 }
 
 static bool
-Typeid_IsImplicitlyConvertibleToBool(Typeid tid)
+Typeid_IsBoolean(Typeid tid)
 {
 	NOT_IMPLEMENTED;
 	(void)tid;
-	return false;
-}
-
-static bool
-Typeid_HasCommonType(Typeid a, Typeid b, Typeid* common_type)
-{
-	NOT_IMPLEMENTED;
-	(void)a, b, common_type;
 	return false;
 }
 

@@ -75,11 +75,11 @@ typedef enum AST_Kind
 	ASTKind__PastLastCmpLevelExpr,
 
 	ASTKind__FirstLAndLevelExpr = Token__FirstAndLevel,
-	ASTKind__LAnd = ASTKind__FirstLAndLevelExpr,
+	ASTKind_LAnd = ASTKind__FirstLAndLevelExpr,
 	ASTKind__PastLastLAndLevelExpr,
 
 	ASTKind__FirstLOrLevelExpr = Token__FirstOrLevel,
-	ASTKind__LOr = ASTKind__FirstLOrLevelExpr,
+	ASTKind_LOr = ASTKind__FirstLOrLevelExpr,
 	ASTKind__PastLastLOrLevelExpr,
 	ASTKind__PastLastBinaryExpr = ASTKind__PastLastLOrLevelExpr,
 
