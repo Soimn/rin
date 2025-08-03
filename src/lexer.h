@@ -422,40 +422,9 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 					}
 					else
 					{
-						u64 value_lo = 0;
-						u64 value_hi = 0;
-
-						for (u8* scan = start; scan != cursor; ++scan)
-						{
-							if (*scan == '_') continue;
-
-							if (value_hi & (0xFULL << 60))
-							{
-								//// ERROR: Integer literal is too large to fit in 128 bits
-								__debugbreak();
-								return false;
-							}
-
-							value_hi <<= 4;
-							value_hi  |= value_lo >> 60;
-							value_lo <<= 4;
-
-							if (Char_IsDigit(*cursor)) value_lo |= *scan & 0xF;
-							else                       value_lo |= 9 + (*scan & 0x1F);
-						}
-
-						token->kind = Token_Int128;
-						token->len  = (u16)digit_count;
-
-						Token_Data* token_data_lo = VA_Push(token_array);
-						*token_data_lo = (Token_Data){
-							.integer = value_lo,
-						};
-
-						Token_Data* token_data_hi = VA_Push(token_array);
-						*token_data_hi = (Token_Data){
-							.integer = value_hi,
-						};
+						//// ERROR: Hex int literal is too large to fit in 64 bits
+						__debugbreak();
+						return false;
 					}
 				}
 			}
@@ -569,18 +538,9 @@ LexFile(String input, Virtual_Array* token_array, Virtual_Array* string_array, T
 						}
 						else
 						{
-							token->kind = Token_Int128;
-							token->len  = (u16)digit_count;
-
-							Token_Data* token_data_lo = VA_Push(token_array);
-							*token_data_lo = (Token_Data){
-								.integer = value_lo,
-							};
-
-							Token_Data* token_data_hi = VA_Push(token_array);
-							*token_data_hi = (Token_Data){
-								.integer = value_hi,
-							};
+							//// ERROR: Integer literal is too large to fit in 64 bits
+							__debugbreak();
+							return false;
 						}
 					}
 				}

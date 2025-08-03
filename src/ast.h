@@ -12,7 +12,6 @@ typedef enum AST_Kind
 	ASTKind_String,
 	ASTKind_Char,
 	ASTKind_Int,
-	ASTKind_Int128,
 	ASTKind_Float,
 	ASTKind_Bool,
 	ASTKind_Compound,
@@ -181,14 +180,6 @@ typedef struct AST_Int
 	AST_HEADER;
 	u64 value;
 } AST_Int;
-#pragma pack(pop)
-
-#pragma pack(push, 4)
-typedef struct AST_Int128
-{
-	AST_HEADER;
-	u128 value;
-} AST_Int128;
 #pragma pack(pop)
 
 #pragma pack(push, 4)

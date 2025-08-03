@@ -509,20 +509,6 @@ Parser__ParsePrimaryExpr(Parser* state, AST_Header** expr)
 
 		*expr = &node->header;
 	}
-	else if (token_kind == Token_Int128)
-	{
-		NEXT_TOKEN();
-
-		AST_Int128* node = PUSH_NODE(Int128);
-
-		node->value.lo= GET_TOKEN_DATA().integer;
-		NEXT_TOKEN();
-
-		node->value.hi = GET_TOKEN_DATA().integer;
-		NEXT_TOKEN();
-
-		*expr = &node->header;
-	}
 	else if (token_kind == Token_Float)
 	{
 		NEXT_TOKEN();

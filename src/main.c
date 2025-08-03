@@ -41,7 +41,6 @@ double strtod(const char* str, char** endptr);
 #include "tokens.h"
 #include "lexer.h"
 #include "ast.h"
-#include "types.h"
 #include "parser.h"
 #include "checker.h"
 
