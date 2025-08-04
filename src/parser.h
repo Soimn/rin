@@ -161,13 +161,6 @@ Parser__ParseProc(Parser* state, AST_Header** expr)
 		return false;
 	}
 
-	if (GET_TOKEN().kind == Token_CloseParen)
-	{
-		//// ERROR: Missing parameters
-		NOT_IMPLEMENTED;
-		return false;
-	}
-
 	AST_Parameter* params = 0;
 	if (GET_TOKEN().kind != Token_CloseParen)
 	{
